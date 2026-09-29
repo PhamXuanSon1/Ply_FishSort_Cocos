@@ -71,8 +71,13 @@ Khi Import vào slot, tham số được lưu vào component `FishAnimConfig` tr
 - field trùng tên với property của `Fish` (`swayAngle`, `waveLength`, `finAngle`, `centerFinAngle`, `turnBend`...) ghi đè giá trị mặc định;
 - `OctopusProceduralAnimator` / `CrabProceduralAnimator`: chạy `CreatureAnimator.ts` (port từ Unity) với tham số trong prefab.
 
-Animator đã port: `FishRig`, `Fishdom` (qua `Fish.ts`), `Octopus`, `Crab` (qua `CreatureAnimator.ts`). Loài khác (`Starfish`, `Seahorse`, `Seal`,
-`Turtle`, `HermitCrab`, `Anglerfish`, `Prop`) log cảnh báo khi Import và tạm dùng sóng thân cá / clip có sẵn.
+Animator đã port: `FishRig`, `Fishdom` (qua `Fish.ts`), `Octopus`, `Crab`, `Starfish`, `Seahorse`, `Seal` (qua `CreatureAnimator.ts`,
+engine = FishPoseJob nhánh Wave + SideFin). Loài khác (`Turtle`, `HermitCrab`, `Anglerfish`, `Prop`) log cảnh báo khi Import và tạm dùng
+sóng thân cá. Không có FishAnimConfig thì bạch tuộc / cua / sao biển vẫn được nhận theo bone; cá ngựa / hải cẩu dùng rig cá chuẩn nên
+cần config mới chạy đúng animator.
+
+**Fish Level Setup** cũng gắn FishAnimConfig cho mọi slot được chọn (ô *Project Unity*): GLB được ghép với prefab Unity theo texture
+(md5 giống file texture của prefab), GLB gốc PlayCanvas `SK_FishN` ghép với `Fish_N`. Loài có animator riêng giữ hướng gốc (mặt +Z) khi đặt vào slot.
 
 ## Model trong `Models/Fish Rig` (SK_Fish*.fbx, SK_Prop*.fbx)
 

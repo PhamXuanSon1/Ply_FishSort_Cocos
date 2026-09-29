@@ -217,9 +217,10 @@ async function nextName() {
  * Chuẩn hoá model cá đã nằm trong slot cho giống cá mẫu: layer = layer của slot (UICam chỉ vẽ UI_2D),
  * đầu hướng +Z, tâm mesh ở gốc slot, material slot 0 để trống (Thing.setMeshMat gán material Fish lúc chạy).
  */
-async function setupChild(slot, child, report) {
+async function setupChild(slot, child, report, opts = {}) {
     await setProp(child, 'rotation', { type: 'cc.Vec3', value: { x: 0, y: 0, z: 0 } });
     let m = await sceneScript('measure', slot.uuid, child);
+    if (opts.keepRotation) m.headForward = null; // sinh vật (animator riêng): root space Unity = mặt +Z như model gốc
 
     for (const uuid of m.wrongLayer) {
         await setProp(uuid, 'layer', { type: 'cc.Layers', value: m.slotLayer });
@@ -252,8 +253,42 @@ async function setupChild(slot, child, report) {
     if (m.slots > 1) report('⚠ Mesh có ' + m.slots + ' submesh - chỉ submesh đầu nhận material Fish');
 }
 
-/** Animator Unity đã port sang Cocos (Fish.ts: cá; CreatureAnimator.ts: bạch tuộc, cua). */
-const PORTED = new Set(['FishRigProceduralAnimator', 'FishdomProceduralAnimator', 'OctopusProceduralAnimator', 'CrabProceduralAnimator']);
+/** Animator Unity đã port sang Cocos (Fish.ts: cá; CreatureAnimator.ts: bạch tuộc, cua, sao biển, cá ngựa, hải cẩu). */
+const PORTED = new Set(['FishRigProceduralAnimator', 'FishdomProceduralAnimator', 'OctopusProceduralAnimator', 'CrabProceduralAnimator',
+    'StarfishProceduralAnimator', 'SeahorseProceduralAnimator', 'SealProceduralAnimator']);
+/** Animator của loài không bơi ngang như cá: root space Unity = mặt +Z, không xoay model theo bone head. */
+const CREATURES = new Set(['OctopusProceduralAnimator', 'CrabProceduralAnimator', 'StarfishProceduralAnimator', 'SeahorseProceduralAnimator',
+    'SealProceduralAnimator', 'TurtleProceduralAnimator', 'HermitCrabProceduralAnimator', 'PropProceduralAnimator']);
+
+const md5Cache = new Map(); // file|mtime -> md5
+function fileMd5(file) {
+    try {
+        const key = file + '|' + fs.statSync(file).mtimeMs;
+        if (!md5Cache.has(key)) md5Cache.set(key, require('crypto').createHash('md5').update(fs.readFileSync(file)).digest('hex'));
+        return md5Cache.get(key);
+    } catch (e) {
+        return '';
+    }
+}
+
+/**
+ * Tìm prefab Unity (tham số animator) cho một GLB trong project: texture giống hệt texture Unity (md5) -> prefab đó;
+ * không khớp mà GLB là bản gốc PlayCanvas SK_FishN -> prefab Fish_N (FBX SK_FishN). Không thấy -> null.
+ */
+function matchUnity(unityRoot, fish) {
+    if (!unityRoot || !unity.isUnityProject(unityRoot)) return null;
+    const list = unity.scanProject(unityRoot).filter((f) => f.fbx);
+    if (fish.png) {
+        const h = fileMd5(fish.png);
+        const hit = h && list.find((f) => f.png && fileMd5(f.png) === h);
+        if (hit) return hit;
+    }
+    const m = /^SK_Fish(\d+)$/i.exec(fish.name);
+    if (m && fish.generator && /PlayCanvas/i.test(fish.generator)) {
+        return list.find((f) => f.name === 'Fish_' + m[1] && /^SK_Fish\d+\.fbx$/i.test(path.basename(f.fbx))) || null;
+    }
+    return null;
+}
 
 /** Gắn FishAnimConfig (tham số animator bake từ prefab Unity) lên node model trong slot. */
 async function writeAnimConfig(nodeUuid, u, report) {
@@ -279,7 +314,7 @@ async function writeAnimConfig(nodeUuid, u, report) {
  * (<tên file> + SkeletalAnimation), skinningRoot của mesh trỏ về slot (đường dẫn joint "RootNode/<Tên>_Rig/..." tính từ đó).
  * GLB gốc (PlayCanvas converter, RootNode scale 0.01) -> scale 50 như các slot gốc. Trả về uuid RootNode.
  */
-async function placeModel(slot, prefabUuid, name, report) {
+async function placeModel(slot, prefabUuid, name, report, opts = {}) {
     const wrapper = await Editor.Message.request('scene', 'create-node', { parent: slot.uuid, assetUuid: prefabUuid, name });
     const u = await sceneScript('unwrapInfo', wrapper);
     let child = wrapper;
@@ -295,7 +330,7 @@ async function placeModel(slot, prefabUuid, name, report) {
             report('RootNode scale 0.01 -> 50 (như các slot gốc)');
         }
     }
-    await setupChild(slot, child, report);
+    await setupChild(slot, child, report, opts);
     return child;
 }
 
@@ -312,7 +347,7 @@ async function placeInSlot(opts, prefabUuid, textureUuid, report) {
         report('Đã xoá ' + ((info && info.children.length) || 0) + ' node con cũ của ' + slot.name);
     }
 
-    const child = await placeModel(slot, prefabUuid, opts.outName, report);
+    const child = await placeModel(slot, prefabUuid, opts.outName, report, { keepRotation: !!(opts.unity && CREATURES.has(opts.unity.animator)) });
     if (opts.unity) await writeAnimConfig(child, opts.unity, report);
 
     // Mats.textures[index] = texture của cá
@@ -342,16 +377,16 @@ const ROOM_TS = 'db://assets/7.Scripts/Gameplay/Room.ts';
 const BUBBLE_RE = /(export const BubbleData:\s*\r?\n\s*\[number, number, number\[\]\]\[\]\s*=\s*\r?\n)([^\r\n]*)/;
 const ITEMS_RE = /export const Items = \[[\s\S]*?\r?\n\][ \t]*\r?\n/;
 
-/** Tên node mesh (có skin) trong GLB - tên model (Fish20, Fish24, african_jewelfish...). */
-function glbModelName(file) {
+/** Tên node mesh (có skin) trong GLB - tên model (Fish20, Fish24, african_jewelfish...) + generator (PlayCanvas = bản gốc). */
+function glbInfo(file) {
     try {
         const d = fs.readFileSync(file);
         const len = d.readUInt32LE(12);
         const j = JSON.parse(d.toString('utf8', 20, 20 + len));
         const n = (j.nodes || []).find((x) => x.mesh !== undefined && x.skin !== undefined) || (j.nodes || []).find((x) => x.mesh !== undefined);
-        return n && n.name ? n.name : '';
+        return { model: n && n.name ? n.name : '', generator: (j.asset && j.asset.generator) || '' };
     } catch (e) {
-        return '';
+        return { model: '', generator: '' };
     }
 }
 
@@ -400,7 +435,7 @@ async function writeRoomData(data, items) {
 }
 
 /** Cá trong project: mỗi SK_FishN.glb = loại N-1 (slot SK_Fish<N-1>), kèm trạng thái trong scene / level. */
-async function listProjectFish() {
+async function listProjectFish(unityRoot) {
     const meshDir = await dbToFs(MESH_DIR);
     const texDir = await dbToFs(TEX_DIR);
     const level = await sceneScript('levelInfo');
@@ -415,11 +450,14 @@ async function listProjectFish() {
         if (!m) continue;
         const index = parseInt(m[1], 10) - 1;
         const file = path.join(meshDir, f);
-        const model = glbModelName(file);
+        const { model, generator } = glbInfo(file);
         const png = findTex('T_' + model + '_D.png') || findTex(model + '.png') || findTex('T_Fish' + m[1] + '_D.png');
         const slot = level.slots[index];
+        const name = f.replace(/\.glb$/i, '');
+        const u = matchUnity(unityRoot, { name, png, generator });
         list.push({
-            name: f.replace(/\.glb$/i, ''), file, url: MESH_DIR + '/' + f, index, model, png,
+            name, file, url: MESH_DIR + '/' + f, index, model, png, generator,
+            unity: u ? u.unity : null, unityName: u ? u.name : '',
             mtime: fs.statSync(file).mtimeMs,
             slotModel: slot ? slot.model : null,
             inScene: !!slot && slot.model === model,
@@ -441,7 +479,7 @@ async function applyLevel(opts) {
     try {
         const selected = Array.from(new Set(opts.selected || [])).sort((a, b) => a - b);
         if (!selected.length) throw new Error('Chưa chọn con cá nào');
-        const all = (await listProjectFish()).fish;
+        const all = (await listProjectFish(opts.unityRoot)).fish;
         const pick = selected.map((i) => all.find((f) => f.index === i)).filter(Boolean);
         let level = await sceneScript('levelInfo');
         if (!level.fishRoot || !level.room) throw new Error('Không thấy node Fish / component Room - mở PlayScene trước');
@@ -462,11 +500,18 @@ async function applyLevel(opts) {
         const tex = slotsInfo.mats ? slotsInfo.mats.textures.slice() : [];
         for (const f of pick) {
             const slot = level.slots[f.index];
+            let child = slot.children[0] || null;
             if (slot.model !== f.model) {
                 for (const c of slot.children) await Editor.Message.request('scene', 'remove-node', { uuid: c });
                 const prefab = await waitSubAsset(f.url, (s) => /\.prefab$/.test(s.name));
-                await placeModel(slot, prefab, f.name, () => {});
+                child = await placeModel(slot, prefab, f.name, () => {}, { keepRotation: !!(f.unity && CREATURES.has(f.unity.animator)) });
                 report('Slot ' + f.index + ' (' + slot.name + '): đặt ' + f.name + ' (' + f.model + ')');
+            }
+            // tham số animator bake từ prefab Unity (FishAnimConfig trên RootNode)
+            if (child && f.unity) {
+                await writeAnimConfig(child, f.unity, (s) => report('Slot ' + f.index + ': ' + s));
+            } else if (child && opts.unityRoot) {
+                report('Slot ' + f.index + ': không tìm thấy prefab Unity cho ' + f.name + ' - dùng tham số mặc định');
             }
             if (f.png) {
                 const texUrl = await Editor.Message.request('asset-db', 'query-url', f.png);
@@ -540,8 +585,8 @@ exports.methods = {
         Editor.Panel.open(PKG + '.level');
     },
 
-    listProjectFish() {
-        return listProjectFish();
+    listProjectFish(unityRoot) {
+        return listProjectFish(unityRoot);
     },
 
     /** Ảnh xem trước của GLB trong project (cache theo tên + thời điểm sửa file). */

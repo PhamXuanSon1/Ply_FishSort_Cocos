@@ -36,6 +36,12 @@
             <ui-checkbox slot="content" id="save" value="true"></ui-checkbox>
         </ui-prop>
         <div class="row">
+            <span class="hint">Project Unity (tham số animator):</span>
+            <ui-input id="unityRoot" class="grow" placeholder="F:\AssetFish\FishSort-new-item"></ui-input>
+        </div>
+        <div class="hint indent">Mỗi slot được chọn gắn FishAnimConfig bake từ prefab Unity tương ứng (ghép theo texture, hoặc SK_FishN gốc = Fish_N).
+            Để trống = không gắn, cá dùng tham số mặc định.</div>
+        <div class="row">
             <span class="hint">Blender (render ảnh):</span>
             <ui-input id="blender" class="grow"></ui-input>
         </div>

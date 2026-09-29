@@ -24,6 +24,7 @@ exports.$ = {
     clearUnused: '#clearUnused',
     save: '#save',
     blender: '#blender',
+    unityRoot: '#unityRoot',
     apply: '#apply',
     status: '#status',
     log: '#log',
@@ -58,6 +59,7 @@ exports.methods = {
     persist() {
         savePrefs({
             blender: this.$.blender.value.trim(),
+            unityRoot: this.$.unityRoot.value.trim(),
             regen: !!this.$.regen.value,
             clearUnused: !!this.$.clearUnused.value,
             save: !!this.$.save.value,
@@ -66,7 +68,7 @@ exports.methods = {
 
     async load() {
         this.$.status.textContent = 'Đang đọc...';
-        const res = await Editor.Message.request(PKG, 'list-project-fish').catch((e) => ({ error: e.message }));
+        const res = await Editor.Message.request(PKG, 'list-project-fish', this.$.unityRoot.value.trim()).catch((e) => ({ error: e.message }));
         if (!res || res.error || !res.ok) {
             fishList = [];
             this.$.grid.innerHTML = '<span class="hint">Không đọc được scene - mở PlayScene rồi bấm ↻. ' + escapeHtml((res && res.error) || '') + '</span>';
@@ -98,6 +100,7 @@ exports.methods = {
         else if (f.usage) badges.push('<span class="badge warn">' + f.usage + ' con trong BubbleData</span>');
         if (!f.inScene && f.slotModel) badges.push('<span class="badge warn">slot đang là ' + escapeHtml(f.slotModel) + '</span>');
         if (!f.png) badges.push('<span class="badge warn">thiếu texture</span>');
+        if (f.unity) badges.push('<span class="badge" title="' + escapeHtml(f.unity.prefab) + '">' + escapeHtml(f.unity.animator.replace('ProceduralAnimator', '')) + ' · ' + escapeHtml(f.unityName) + '</span>');
         return '<div class="card' + (picked.has(f.index) ? ' picked' : '') + '" data-i="' + i + '" title="' + escapeHtml(f.url + '\nmodel: ' + f.model + (f.png ? '\ntexture: ' + path.basename(f.png) : '')) + '">'
             + '<span class="check">' + (picked.has(f.index) ? '✔' : '') + '</span>'
             + '<div class="thumb">…</div>'
@@ -182,6 +185,7 @@ exports.methods = {
         this.$.log.textContent = 'Đang áp dụng ' + selected.length + ' loại cá...';
         const res = await Editor.Message.request(PKG, 'apply-level', {
             selected,
+            unityRoot: this.$.unityRoot.value.trim(),
             regen: !!this.$.regen.value,
             clearUnused: !!this.$.clearUnused.value,
             save: !!this.$.save.value,
@@ -198,6 +202,7 @@ exports.ready = async function () {
     const prefs = loadPrefs(PREFS);
     const importerPrefs = loadPrefs(PKG);
     this.$.blender.value = prefs.blender || importerPrefs.blender || '';
+    this.$.unityRoot.value = prefs.unityRoot !== undefined ? prefs.unityRoot : 'F:\\AssetFish\\FishSort-new-item';
     this.$.regen.value = prefs.regen !== undefined ? prefs.regen : true;
     this.$.clearUnused.value = prefs.clearUnused !== undefined ? prefs.clearUnused : true;
     this.$.save.value = prefs.save !== undefined ? prefs.save : true;
@@ -209,6 +214,7 @@ exports.ready = async function () {
     this.$.apply.addEventListener('confirm', this.onApply.bind(this));
     this.$.grid.addEventListener('click', this.onGridClick.bind(this));
     for (const k of ['regen', 'clearUnused', 'save', 'blender']) this.$[k].addEventListener('change', this.persist.bind(this));
+    this.$.unityRoot.addEventListener('change', () => { this.persist(); this.load(); });
 
     await this.load();
 };
