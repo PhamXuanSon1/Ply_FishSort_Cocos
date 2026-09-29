@@ -2,7 +2,7 @@
   "ver": "1.0.27",
   "importer": "image",
   "imported": true,
-  "uuid": "5b6078bd-9d0e-4121-97b8-c6312abb5576",
+  "uuid": "5fe39c2f-cd28-4592-b25e-3f15e16893d6",
   "files": [
     ".json",
     ".png"
@@ -10,14 +10,14 @@
   "subMetas": {
     "6c48a": {
       "importer": "texture",
-      "uuid": "5b6078bd-9d0e-4121-97b8-c6312abb5576@6c48a",
-      "displayName": "achilles_tang",
+      "uuid": "5fe39c2f-cd28-4592-b25e-3f15e16893d6@6c48a",
+      "displayName": "T_Fish25_D",
       "id": "6c48a",
       "name": "texture",
       "userData": {
         "wrapModeS": "clamp-to-edge",
         "wrapModeT": "clamp-to-edge",
-        "imageUuidOrDatabaseUri": "5b6078bd-9d0e-4121-97b8-c6312abb5576",
+        "imageUuidOrDatabaseUri": "5fe39c2f-cd28-4592-b25e-3f15e16893d6",
         "isUuid": true,
         "visible": false,
         "minfilter": "linear",
@@ -34,8 +34,8 @@
     },
     "f9941": {
       "importer": "sprite-frame",
-      "uuid": "5b6078bd-9d0e-4121-97b8-c6312abb5576@f9941",
-      "displayName": "achilles_tang",
+      "uuid": "5fe39c2f-cd28-4592-b25e-3f15e16893d6@f9941",
+      "displayName": "T_Fish25_D",
       "id": "f9941",
       "name": "spriteFrame",
       "userData": {
@@ -113,7 +113,7 @@
           ]
         },
         "isUuid": true,
-        "imageUuidOrDatabaseUri": "5b6078bd-9d0e-4121-97b8-c6312abb5576@6c48a",
+        "imageUuidOrDatabaseUri": "5fe39c2f-cd28-4592-b25e-3f15e16893d6@6c48a",
         "atlasUuid": "",
         "trimType": "auto"
       },
@@ -129,6 +129,6 @@
     "type": "sprite-frame",
     "fixAlphaTransparencyArtifacts": false,
     "hasAlpha": true,
-    "redirect": "5b6078bd-9d0e-4121-97b8-c6312abb5576@6c48a"
+    "redirect": "5fe39c2f-cd28-4592-b25e-3f15e16893d6@6c48a"
   }
 }

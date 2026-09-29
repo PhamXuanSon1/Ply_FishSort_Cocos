@@ -1,0 +1,110 @@
+{
+  "ver": "2.3.14",
+  "importer": "gltf",
+  "imported": true,
+  "uuid": "0c9259c9-4fc5-4fa8-8bef-d1c486dc5a52",
+  "files": [],
+  "subMetas": {
+    "83852": {
+      "importer": "gltf-scene",
+      "uuid": "0c9259c9-4fc5-4fa8-8bef-d1c486dc5a52@83852",
+      "displayName": "",
+      "id": "83852",
+      "name": "SK_Fish23.prefab",
+      "userData": {
+        "gltfIndex": 0
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "f6404": {
+      "importer": "gltf-mesh",
+      "uuid": "0c9259c9-4fc5-4fa8-8bef-d1c486dc5a52@f6404",
+      "displayName": "",
+      "id": "f6404",
+      "name": "Fish23.mesh",
+      "userData": {
+        "gltfIndex": 0,
+        "triangleCount": 2248
+      },
+      "ver": "1.1.1",
+      "imported": true,
+      "files": [
+        ".bin",
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "642bc": {
+      "importer": "gltf-skeleton",
+      "uuid": "0c9259c9-4fc5-4fa8-8bef-d1c486dc5a52@642bc",
+      "displayName": "",
+      "id": "642bc",
+      "name": "Fish23_Rig.skeleton",
+      "userData": {
+        "gltfIndex": 0,
+        "jointsLength": 84
+      },
+      "ver": "1.0.1",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    }
+  },
+  "userData": {
+    "imageMetas": [],
+    "lods": {
+      "enable": false,
+      "hasBuiltinLOD": false,
+      "options": [
+        {
+          "screenRatio": 0.25,
+          "faceCount": 1
+        },
+        {
+          "screenRatio": 0.125,
+          "faceCount": 0.25
+        },
+        {
+          "screenRatio": 0.01,
+          "faceCount": 0.1
+        }
+      ]
+    },
+    "assetFinder": {
+      "meshes": [
+        "0c9259c9-4fc5-4fa8-8bef-d1c486dc5a52@f6404"
+      ],
+      "skeletons": [
+        "0c9259c9-4fc5-4fa8-8bef-d1c486dc5a52@642bc"
+      ],
+      "textures": [],
+      "materials": [],
+      "scenes": [
+        "0c9259c9-4fc5-4fa8-8bef-d1c486dc5a52@83852"
+      ]
+    },
+    "meshOptimize": {
+      "enable": true,
+      "vertexCache": true,
+      "vertexFetch": true,
+      "overdraw": true
+    },
+    "meshSimplify": {
+      "enable": true,
+      "targetRatio": 1
+    },
+    "meshCompress": {
+      "enable": true,
+      "encode": false,
+      "compress": true,
+      "quantize": true
+    }
+  }
+}

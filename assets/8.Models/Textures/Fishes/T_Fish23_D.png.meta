@@ -2,7 +2,7 @@
   "ver": "1.0.27",
   "importer": "image",
   "imported": true,
-  "uuid": "bf470cba-aaad-4c11-9f4e-ca73fbdbcf7c",
+  "uuid": "683116eb-318a-4327-b0ac-3482a57b5b1b",
   "files": [
     ".json",
     ".png"
@@ -10,14 +10,14 @@
   "subMetas": {
     "6c48a": {
       "importer": "texture",
-      "uuid": "bf470cba-aaad-4c11-9f4e-ca73fbdbcf7c@6c48a",
-      "displayName": "african_jewelfish",
+      "uuid": "683116eb-318a-4327-b0ac-3482a57b5b1b@6c48a",
+      "displayName": "T_Fish23_D",
       "id": "6c48a",
       "name": "texture",
       "userData": {
         "wrapModeS": "clamp-to-edge",
         "wrapModeT": "clamp-to-edge",
-        "imageUuidOrDatabaseUri": "bf470cba-aaad-4c11-9f4e-ca73fbdbcf7c",
+        "imageUuidOrDatabaseUri": "683116eb-318a-4327-b0ac-3482a57b5b1b",
         "isUuid": true,
         "visible": false,
         "minfilter": "linear",
@@ -34,8 +34,8 @@
     },
     "f9941": {
       "importer": "sprite-frame",
-      "uuid": "bf470cba-aaad-4c11-9f4e-ca73fbdbcf7c@f9941",
-      "displayName": "african_jewelfish",
+      "uuid": "683116eb-318a-4327-b0ac-3482a57b5b1b@f9941",
+      "displayName": "T_Fish23_D",
       "id": "f9941",
       "name": "spriteFrame",
       "userData": {
@@ -45,10 +45,10 @@
         "offsetY": 0,
         "trimX": 0,
         "trimY": 0,
-        "width": 256,
-        "height": 256,
-        "rawWidth": 256,
-        "rawHeight": 256,
+        "width": 1024,
+        "height": 1024,
+        "rawWidth": 1024,
+        "rawHeight": 1024,
         "borderTop": 0,
         "borderBottom": 0,
         "borderLeft": 0,
@@ -60,17 +60,17 @@
         "meshType": 0,
         "vertices": {
           "rawPosition": [
-            -128,
-            -128,
+            -512,
+            -512,
             0,
-            128,
-            -128,
+            512,
+            -512,
             0,
-            -128,
-            128,
+            -512,
+            512,
             0,
-            128,
-            128,
+            512,
+            512,
             0
           ],
           "indexes": [
@@ -83,12 +83,12 @@
           ],
           "uv": [
             0,
-            256,
-            256,
-            256,
+            1024,
+            1024,
+            1024,
             0,
             0,
-            256,
+            1024,
             0
           ],
           "nuv": [
@@ -102,18 +102,18 @@
             1
           ],
           "minPos": [
-            -128,
-            -128,
+            -512,
+            -512,
             0
           ],
           "maxPos": [
-            128,
-            128,
+            512,
+            512,
             0
           ]
         },
         "isUuid": true,
-        "imageUuidOrDatabaseUri": "bf470cba-aaad-4c11-9f4e-ca73fbdbcf7c@6c48a",
+        "imageUuidOrDatabaseUri": "683116eb-318a-4327-b0ac-3482a57b5b1b@6c48a",
         "atlasUuid": "",
         "trimType": "auto"
       },
@@ -128,7 +128,7 @@
   "userData": {
     "type": "sprite-frame",
     "fixAlphaTransparencyArtifacts": false,
-    "hasAlpha": true,
-    "redirect": "bf470cba-aaad-4c11-9f4e-ca73fbdbcf7c@6c48a"
+    "hasAlpha": false,
+    "redirect": "683116eb-318a-4327-b0ac-3482a57b5b1b@6c48a"
   }
 }
