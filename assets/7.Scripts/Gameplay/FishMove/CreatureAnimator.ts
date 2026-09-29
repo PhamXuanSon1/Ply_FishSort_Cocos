@@ -1,4 +1,5 @@
 import { Node, Quat, Vec3, clamp, clamp01, lerp } from 'cc';
+import type { FishAnimConfig } from './FishAnimConfig';
 
 const DEG2RAD = Math.PI / 180;
 const RAD2DEG = 180 / Math.PI;
@@ -110,6 +111,31 @@ function hasDescendant(root: Node, test: (n: Node) => boolean): boolean {
     return false;
 }
 
+/** Không có config: đoán loài theo bone dưới body (Spine nông nhất). */
+function detectKind(body: Node): string {
+    // cá (kể cả cua ẩn sĩ có chân / càng) có chuỗi thân Spine_2.. / Tail: để Fish.ts lo
+    if (hasDescendant(body, n => /^(Spine|Tail)_?0*[2-9]/i.test(n.name) || /^Tail/i.test(n.name))) return '';
+    const arms = children(body, 'Arm_');
+    if (arms.some(a => child(a, 'Claw')) || children(body, 'Leg_').length > 0) return 'CrabProceduralAnimator';
+    if (child(body, 'Head') && arms.length >= 3) return 'OctopusProceduralAnimator';
+    return '';
+}
+
+/** Tham số mặc định (theo code Unity) ghi đè bằng field cùng tên trong prefab. */
+function withParams<T extends Record<string, number>>(defaults: T, params: Record<string, number>): T {
+    const out = { ...defaults };
+    for (const k of Object.keys(defaults)) if (typeof params[k] === 'number') (out as Record<string, number>)[k] = params[k];
+    return out;
+}
+
+/** Tham số chung của lớp cha FishProceduralAnimator lấy từ prefab. */
+const BASE_KEYS = ['turnBend', 'pitchBend', 'bendDelay', 'bendSmoothing', 'maxBendPerBone', 'idleSpeed', 'swimSpeed', 'blendSmoothing'];
+function baseParams(params: Record<string, number>): Partial<CreatureParams> {
+    const out: Record<string, number> = {};
+    for (const k of BASE_KEYS) if (typeof params[k] === 'number') out[k] = params[k];
+    return out as Partial<CreatureParams>;
+}
+
 // scratch
 const _v = new Vec3();
 const _qInv = new Quat();
@@ -156,15 +182,17 @@ export class CreatureAnimator {
         this.p.swimSpeed = Math.max(this.p.swimSpeed, this.p.idleSpeed + 0.01);
     }
 
-    /** Nhận diện rig bạch tuộc / cua dưới root (node gắn Fish); không phải thì null (Fish dùng sóng thân cá). */
-    static tryCreate(root: Node): CreatureAnimator | null {
+    /**
+     * Animator cho rig bạch tuộc / cua dưới root (node gắn Fish); không phải thì null (Fish dùng sóng thân cá).
+     * Có config (bake từ prefab Unity): chọn theo tên class animator và lấy tham số trong prefab; không có thì đoán theo bone.
+     */
+    static tryCreate(root: Node, config?: FishAnimConfig | null): CreatureAnimator | null {
         const body = findShallowest(root, 'Spine');
         if (!body) return null;
-        // cá (kể cả cua ẩn sĩ có chân / càng) có chuỗi thân Spine_2.. / Tail: để Fish.ts lo
-        if (hasDescendant(body, n => /^(Spine|Tail)_?0*[2-9]/i.test(n.name) || /^Tail/i.test(n.name))) return null;
-        const arms = children(body, 'Arm_');
-        if (arms.some(a => child(a, 'Claw')) || children(body, 'Leg_').length > 0) return buildCrab(root, body);
-        if (child(body, 'Head') && arms.length >= 3) return buildOctopus(root, body);
+        const params = config ? config.params : {};
+        const kind = config && config.animator ? config.animator : detectKind(body);
+        if (kind === 'OctopusProceduralAnimator') return buildOctopus(root, body, params);
+        if (kind === 'CrabProceduralAnimator') return buildCrab(root, body, params);
         return null;
     }
 
@@ -365,9 +393,10 @@ const OCTOPUS = {
     ringWave: 0.3,
 };
 
-function buildOctopus(root: Node, body: Node): CreatureAnimator {
-    const o = OCTOPUS;
+function buildOctopus(root: Node, body: Node, params: Record<string, number>): CreatureAnimator {
+    const o = withParams(OCTOPUS, params);
     const a = new CreatureAnimator('octopus', root, {
+        ...baseParams(params),
         swayFrequency: o.pulseFrequency, waveK: 0, steadyRhythm: true, swimSwayFrequency: o.swimFrequency,
     });
 
@@ -437,9 +466,9 @@ function swingAxis(dir: Vec3, fallback: Vec3): Vec3 {
     return Vec3.lengthSqr(a) > 1e-8 ? a.normalize() : fallback.clone();
 }
 
-function buildCrab(root: Node, body: Node): CreatureAnimator {
-    const c = CRAB;
-    const a = new CreatureAnimator('crab', root, { swayFrequency: c.kickFrequency, waveK: 0 });
+function buildCrab(root: Node, body: Node, params: Record<string, number>): CreatureAnimator {
+    const c = withParams(CRAB, params);
+    const a = new CreatureAnimator('crab', root, { ...baseParams(params), swayFrequency: c.kickFrequency, waveK: 0 });
 
     a.register(body, { amp: c.bodySway, bendScale: 1, pitchBend: true, axis: 0 });
     const head = child(body, 'Head');

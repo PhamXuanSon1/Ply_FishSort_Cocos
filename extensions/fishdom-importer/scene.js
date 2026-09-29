@@ -152,6 +152,29 @@ exports.methods = {
         };
     },
 
+    /** Vị trí component theo tên class trên node (-1 nếu không có), để set-property '__comps__.<i>.field'. */
+    componentIndex(nodeUuid, className) {
+        const node = findByUuid(nodeUuid);
+        if (!node) return -1;
+        return node.components.findIndex((c) => c.constructor && c.constructor.name === className);
+    },
+
+    /**
+     * Prefab GLB vừa tạo = <tên file> [SkeletalAnimation] > RootNode > mesh + rig. Cá mẫu chỉ giữ RootNode trong slot:
+     * trả về RootNode + SkinnedMeshRenderer (để trỏ skinningRoot về slot sau khi bỏ lớp bọc).
+     */
+    unwrapInfo(wrapperUuid) {
+        const wrapper = findByUuid(wrapperUuid);
+        if (!wrapper) throw new Error('Không tìm thấy node vừa tạo');
+        const inner = wrapper.children.length === 1 ? wrapper.children[0] : null;
+        const renderer = wrapper.getComponentInChildren(SkinnedMeshRenderer);
+        return {
+            inner: inner ? inner.uuid : null,
+            meshNode: renderer ? renderer.node.uuid : null,
+            meshCompIndex: renderer ? renderer.node.components.indexOf(renderer) : -1,
+        };
+    },
+
     /** Con đầu tiên của slot (model cá đã đặt), để "sửa slot" không cần import lại. */
     slotChild(slotUuid) {
         const slot = findByUuid(slotUuid);

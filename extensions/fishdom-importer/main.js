@@ -11,6 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
+const unity = require('./unity');
 
 const PKG = 'fishdom-importer';
 const MESH_DIR = 'db://assets/8.Models/Meshes/Fishes';
@@ -51,9 +52,9 @@ function detectBlender() {
     return found.length ? found[0].exe : '';
 }
 
-function runBlender(blender, fbx, png, out, scale, scriptName = 'convert.py') {
+function runBlender(blender, fbx, png, out, scale, scriptName = 'convert.py', extra = []) {
     const script = path.join(__dirname, 'scripts', scriptName);
-    const args = ['-b', '--factory-startup', '--python', script, '--', fbx, png || '', out, String(scale)];
+    const args = ['-b', '--factory-startup', '--python', script, '--', fbx, png || '', out, String(scale), ...extra];
     return new Promise((resolve, reject) => {
         const p = spawn(blender, args, { windowsHide: true });
         let stdout = '';
@@ -182,6 +183,19 @@ async function importFile(src, dbUrl, overwrite) {
     return file;
 }
 
+/** Thiết lập import mesh giống các SK_Fish*.glb mẫu: tối ưu + nén + simplify (ratio 1). */
+async function applyMeshSettings(glbUrl) {
+    const meta = await Editor.Message.request('asset-db', 'query-asset-meta', glbUrl).catch(() => null);
+    if (!meta || !meta.userData) return;
+    Object.assign(meta.userData, {
+        meshOptimize: { enable: true, vertexCache: true, vertexFetch: true, overdraw: true },
+        meshSimplify: { enable: true, targetRatio: 1 },
+        meshCompress: { enable: true, encode: false, compress: true, quantize: true },
+    });
+    await Editor.Message.request('asset-db', 'save-asset-meta', glbUrl, JSON.stringify(meta));
+    await Editor.Message.request('asset-db', 'refresh-asset', glbUrl);
+}
+
 /** Tên kế tiếp chưa dùng: SK_Fish<max+1> theo các file GLB có sẵn. */
 async function nextName() {
     const dir = await dbToFs(MESH_DIR).catch(() => '');
@@ -236,6 +250,28 @@ async function setupChild(slot, child, report) {
     if (m.slots > 1) report('⚠ Mesh có ' + m.slots + ' submesh - chỉ submesh đầu nhận material Fish');
 }
 
+/** Animator Unity đã port sang Cocos (Fish.ts: cá; CreatureAnimator.ts: bạch tuộc, cua). */
+const PORTED = new Set(['FishRigProceduralAnimator', 'FishdomProceduralAnimator', 'OctopusProceduralAnimator', 'CrabProceduralAnimator']);
+
+/** Gắn FishAnimConfig (tham số animator bake từ prefab Unity) lên node model trong slot. */
+async function writeAnimConfig(nodeUuid, u, report) {
+    let idx = await sceneScript('componentIndex', nodeUuid, 'FishAnimConfig');
+    if (idx < 0) {
+        await Editor.Message.request('scene', 'create-component', { uuid: nodeUuid, component: 'FishAnimConfig' });
+        idx = await sceneScript('componentIndex', nodeUuid, 'FishAnimConfig');
+    }
+    if (idx < 0) throw new Error('Không gắn được FishAnimConfig (script đã compile chưa?)');
+    const base = '__comps__.' + idx + '.';
+    await setProp(nodeUuid, base + 'animator', { type: 'String', value: u.animator });
+    await setProp(nodeUuid, base + 'source', { type: 'String', value: u.prefab });
+    await setProp(nodeUuid, base + 'orientation', { type: 'Number', value: u.orientation || 0 });
+    await setProp(nodeUuid, base + 'paramsJson', { type: 'String', value: JSON.stringify(u.params) });
+    report('FishAnimConfig: ' + u.animator + ', ' + Object.keys(u.params).length + ' tham số từ ' + u.prefab);
+    if (!PORTED.has(u.animator)) {
+        report('⚠ ' + u.animator + ' chưa port sang Cocos - Fish.ts sẽ dùng sóng thân cá / clip thay thế');
+    }
+}
+
 async function placeInSlot(opts, prefabUuid, textureUuid, report) {
     const slots = await sceneScript('listSlots');
     const slot = slots.slots.find((s) => s.uuid === opts.slotUuid);
@@ -249,10 +285,23 @@ async function placeInSlot(opts, prefabUuid, textureUuid, report) {
         report('Đã xoá ' + ((info && info.children.length) || 0) + ' node con cũ của ' + slot.name);
     }
 
-    const child = await Editor.Message.request('scene', 'create-node', {
+    // giống cá mẫu: SK_FishN > RootNode > <Tên> (mesh) + <Tên>_Rig; bỏ lớp bọc prefab (<tên file> + SkeletalAnimation),
+    // skinningRoot của mesh trỏ về slot (đường dẫn joint "RootNode/<Tên>_Rig/..." tính từ đó)
+    const wrapper = await Editor.Message.request('scene', 'create-node', {
         parent: slot.uuid, assetUuid: prefabUuid, name: opts.outName,
     });
+    const u = await sceneScript('unwrapInfo', wrapper);
+    let child = wrapper;
+    if (u.inner) {
+        await Editor.Message.request('scene', 'set-parent', { parent: slot.uuid, uuids: [u.inner], keepWorldTransform: false });
+        await Editor.Message.request('scene', 'remove-node', { uuid: wrapper });
+        child = u.inner;
+        if (u.meshNode) {
+            await setProp(u.meshNode, '__comps__.' + u.meshCompIndex + '.skinningRoot', { type: 'cc.Node', value: { uuid: slot.uuid } });
+        }
+    }
     await setupChild(slot, child, report);
+    if (opts.unity) await writeAnimConfig(child, opts.unity, report);
 
     // Mats.textures[index] = texture của cá
     if (slots.mats && textureUuid) {
@@ -286,8 +335,22 @@ exports.methods = {
         return detectBlender();
     },
 
-    async listFish(folder) {
+    async listFish(folder, force) {
         const list = [];
+        if (unity.isUnityProject(folder)) {
+            // project Unity: mỗi prefab có *ProceduralAnimator là một con, kèm tham số animator để bake
+            for (const f of unity.scanProject(folder, force)) {
+                if (!f.fbx) continue;
+                let { png, warning } = f;
+                if (!png) {
+                    const tex = resolveTexture(path.dirname(f.fbx), path.basename(f.fbx, path.extname(f.fbx)), f.fbx);
+                    png = tex.png;
+                    warning = tex.warning;
+                }
+                list.push({ name: f.name, fbx: f.fbx, png, warning, unity: f.unity });
+            }
+            return { fish: list, nextName: await nextName(), unityProject: true };
+        }
         if (folder && fs.existsSync(folder)) {
             for (const f of fs.readdirSync(folder).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))) {
                 if (!/\.fbx$/i.test(f)) continue;
@@ -350,28 +413,31 @@ exports.methods = {
             const outName = (opts.outName || '').trim();
             if (!/^[\w-]+$/.test(outName)) throw new Error('Tên file GLB không hợp lệ');
             const fishName = path.basename(opts.fbx).replace(/\.fbx$/i, '');
+            // tên theo slot như các cá mẫu: SK_Fish24 -> mesh Fish24, skeleton Fish24_Rig, texture T_Fish24_D.png
+            const baseName = outName.replace(/^SK_/i, '');
 
             report('Blender: chuyển ' + fishName + '.fbx (scale ×' + opts.scale + ')...');
             const tmp = path.join(Editor.Project.path, 'temp', PKG, outName + '.glb');
             fs.mkdirSync(path.dirname(tmp), { recursive: true });
-            const r = await runBlender(opts.blender, opts.fbx, opts.png, tmp, opts.scale);
+            const r = await runBlender(opts.blender, opts.fbx, opts.png, tmp, opts.scale, 'convert.py', [baseName]);
             report('GLB: ' + r.meshes + ' mesh, ' + r.bones + ' xương, ' + r.tris + ' tam giác, cỡ ' + r.size.join(' × '));
             const body = (r.boneNames || []).filter((n) => /^(Spine|Tail|body)_?\d+$/i.test(n)).length;
-            if (body < 2) {
-                report((r.clips && r.clips.length)
-                    ? 'Chỉ ' + body + ' xương thân - Fish.ts sẽ phát animation clip có sẵn (' + r.clips.join(', ') + ')'
-                    : '⚠ Chỉ ' + body + ' xương thân và không có animation clip - con này sẽ đứng yên');
+            if (body < 2 && !(opts.unity && PORTED.has(opts.unity.animator))) {
+                // không phải cá: CreatureAnimator nhận bạch tuộc / cua theo bone, loài khác dùng clip có sẵn (nếu có)
+                report('Chỉ ' + body + ' xương thân - Fish.ts dùng animator bạch tuộc / cua nếu nhận ra rig, không thì '
+                    + ((r.clips && r.clips.length) ? 'phát clip có sẵn (' + r.clips.join(', ') + ')' : 'con này sẽ đứng yên'));
             }
 
             const glbUrl = MESH_DIR + '/' + outName + '.glb';
             await importFile(tmp, glbUrl, true);
+            await applyMeshSettings(glbUrl);
             const prefabUuid = await waitSubAsset(glbUrl, (s) => /\.prefab$/.test(s.name));
             report('Đã import ' + glbUrl);
 
             let textureUuid = '';
             if (opts.png) {
-                const texUrl = TEX_DIR + '/' + path.basename(opts.png);
-                await importFile(opts.png, texUrl, false);
+                const texUrl = TEX_DIR + '/T_' + baseName + '_D' + path.extname(opts.png).toLowerCase();
+                await importFile(opts.png, texUrl, true);
                 textureUuid = await waitSubAsset(texUrl, (s) => s.type === 'cc.Texture2D');
                 report('Texture ' + texUrl);
             } else {
@@ -382,7 +448,7 @@ exports.methods = {
                 const placed = await placeInSlot(Object.assign({}, opts, { outName }), prefabUuid, textureUuid, report);
                 report('Xong: ' + outName + ' đã vào ' + placed.slot + ' (loại cá ' + placed.index + ')');
             } else {
-                report('Xong: chỉ import asset, không đặt vào slot');
+                report('Xong: chỉ import asset, không đặt vào slot' + (opts.unity ? ' (tham số animator Unity chỉ được lưu khi đặt vào slot)' : ''));
             }
             return { ok: true, log: lines };
         } catch (e) {

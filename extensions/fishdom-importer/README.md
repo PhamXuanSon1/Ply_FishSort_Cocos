@@ -19,7 +19,18 @@ Menu **Tool → Fishdom Fish Importer**. Đưa 1 con cá Fishdom (`FishdomFish/<
 
 ## Tool làm gì
 
-1. Blender (`scripts/convert.py`): gộp mọi material thành 1 (texture nhúng), nhân scale vào vertex + xương, xuất GLB.
+Kết quả cùng dạng với cá mẫu (`SK_Fish1..20`):
+
+```
+Assets:  SK_FishN.glb  ->  <Tên>.mesh, <Tên>_Rig.skeleton, SK_FishN.prefab   (không material / texture / animation)
+Scene:   Room > Fish > SK_FishN (slot)
+                         └─ RootNode            (+ FishAnimConfig nếu bake từ Unity)
+                              ├─ <Tên>          SkinnedMeshRenderer, material trống, skinningRoot = slot
+                              └─ <Tên>_Rig      Root > Spine_1 > ...
+```
+`<Tên>` = tên FBX bỏ `SK_` (SK_Fish21.fbx -> Fish21).
+
+1. Blender (`scripts/convert.py`): gộp mesh, bỏ material, dựng lại cây `RootNode > <Tên> + <Tên>_Rig`, nhân scale vào vertex + xương, xuất GLB. Meta GLB bật meshOptimize / meshSimplify / meshCompress như file mẫu.
 2. Copy GLB vào `assets/8.Models/Meshes/Fishes/<Tên GLB>.glb` (ghi đè nếu đã có, giữ nguyên .meta) và PNG vào `assets/8.Models/Textures/Fishes/<tên cá>.png` (chỉ copy nếu chưa có).
 3. Trong scene (có undo):
    - xoá node con cũ của slot (nếu bật **Xoá con cũ của slot**);
@@ -30,6 +41,22 @@ Menu **Tool → Fishdom Fish Importer**. Đưa 1 con cá Fishdom (`FishdomFish/<
    - lưu scene (nếu bật **Lưu scene**).
 
 Trong editor cá sẽ hiện màu hồng tím và thiếu vây/đuôi vì chưa có material - vào game mới có material `Fish`.
+
+## Bake từ project Unity (khuyên dùng)
+
+Đổi thư mục thành gốc project Unity (vd `F:\AssetFish\FishSort-new-item`, có `Assets/` + `ProjectSettings/`). Tool tự quét mọi prefab
+có component `*ProceduralAnimator` (~70 con: `Fish_1..43`, cá Fishdom, `Prop_*`) và lấy từ prefab:
+
+- FBX nguồn (`PrefabInstance.m_SourcePrefab`) và texture (material override trong prefab, không có thì `externalObjects` trong `.meta` của FBX -> `.mat` -> `_BaseMap` / `_MainTex`);
+- tên class animator + mọi field số (tham số animation đã chỉnh trong Inspector), `FishModel.Orientation`.
+
+Khi Import vào slot, tham số được lưu vào component `FishAnimConfig` trên node model (Inspector xem / sửa được). `Fish.ts` đọc nó lúc `init()`:
+
+- field trùng tên với property của `Fish` (`swayAngle`, `waveLength`, `finAngle`, `centerFinAngle`, `turnBend`...) ghi đè giá trị mặc định;
+- `OctopusProceduralAnimator` / `CrabProceduralAnimator`: chạy `CreatureAnimator.ts` (port từ Unity) với tham số trong prefab.
+
+Animator đã port: `FishRig`, `Fishdom` (qua `Fish.ts`), `Octopus`, `Crab` (qua `CreatureAnimator.ts`). Loài khác (`Starfish`, `Seahorse`, `Seal`,
+`Turtle`, `HermitCrab`, `Anglerfish`, `Prop`) log cảnh báo khi Import và tạm dùng sóng thân cá / clip có sẵn.
 
 ## Model trong `Models/Fish Rig` (SK_Fish*.fbx, SK_Prop*.fbx)
 

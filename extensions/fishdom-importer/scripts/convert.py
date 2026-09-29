@@ -1,41 +1,39 @@
 """
-Chuyển 1 con cá Fishdom (FBX + PNG) sang GLB cho project FishSort.
+Chuyển 1 con cá (FBX) sang GLB cho project FishSort, cùng dạng với các SK_Fish*.glb mẫu:
 
-Chạy bằng Blender (>= 4.5, cần bộ import FBX mới đọc được FBX ASCII):
-    blender -b --factory-startup --python convert.py -- <fbx> <png> <out.glb> [scale]
+    RootNode
+    ├─ <Tên>        mesh (skin), không material
+    └─ <Tên>_Rig    khung xương (Root > Spine_1 > ...)
 
-- Gộp mọi material slot thành 1 material (texture nhúng trong GLB) - project gán material Fish lúc chạy vào slot 0.
-- Nhân scale vào vertex + xương (apply transform) để node gốc có scale = 1. Mặc định 45000.
-- Giữ nguyên skin (xương) để Fish.ts tự animate; FBX Fishdom không có animation clip.
+    <Tên> = tham số [base] (extension truyền tên GLB bỏ "SK_": SK_Fish24 -> Fish24);
+    không truyền thì lấy tên FBX bỏ tiền tố "SK_" (SK_Fish21.fbx -> Fish21).
+GLB chỉ có mesh + skeleton (không material, texture, animation clip): texture nằm riêng trong Textures/Fishes và được
+gán qua Mats.textures[N]; material Fish do Thing.setMeshMat gán lúc chạy; cá bơi bằng Fish.ts / CreatureAnimator.ts.
+
+Chạy bằng Blender (>= 4.5, cần bộ import FBX mới đọc được FBX ASCII của Fishdom):
+    blender -b --factory-startup --python convert.py -- <fbx> <png (không dùng)> <out.glb> [scale] [base]
+
+- Nhiều mesh (vd Fish21: thân + đầu) gộp thành 1.
+- Nhân scale vào vertex + xương (apply transform) để RootNode có scale = 1. Mặc định 45000.
 In ra dòng "RESULT {json}" để extension đọc.
 """
-import bpy, sys, os, json
+import bpy, sys, os, re, json
 
 argv = sys.argv[sys.argv.index("--") + 1:]
-fbx, png, out = argv[0], argv[1], argv[2]
+fbx, out = argv[0], argv[2]
 scale = float(argv[3]) if len(argv) > 3 else 45000.0
 name = os.path.splitext(os.path.basename(fbx))[0]
+base = argv[4] if len(argv) > 4 and argv[4] else re.sub(r'^SK_', '', name, flags=re.I)
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 if hasattr(bpy.ops.wm, "fbx_import"):
     bpy.ops.wm.fbx_import(filepath=fbx)       # importer mới (ufbx), đọc được FBX ASCII
 else:
     bpy.ops.import_scene.fbx(filepath=fbx)    # Blender cũ: chỉ đọc FBX binary
-
-# 1 material, texture nhúng
-mat = bpy.data.materials.new(name)
-mat.use_nodes = True
-nt = mat.node_tree
-bsdf = next(n for n in nt.nodes if n.type == 'BSDF_PRINCIPLED')
-if png and os.path.isfile(png):
-    img = bpy.data.images.load(png)
-    img.pack()
-    tex = nt.nodes.new('ShaderNodeTexImage')
-    tex.image = img
-    nt.links.new(tex.outputs['Color'], bsdf.inputs['Base Color'])
+clips = [a.name for a in bpy.data.actions]
 
 meshes = [o for o in bpy.data.objects if o.type == 'MESH']
-# nhiều mesh (vd Fish21: thân + đầu) -> gộp 1, vì Thing.setMeshMat chỉ gán material cho renderer đầu tiên
+# nhiều mesh -> gộp 1, vì Thing.setMeshMat chỉ gán material cho renderer đầu tiên
 if len(meshes) > 1:
     bpy.ops.object.select_all(action='DESELECT')
     for o in meshes:
@@ -44,16 +42,7 @@ if len(meshes) > 1:
     bpy.ops.object.join()
     meshes = [o for o in bpy.data.objects if o.type == 'MESH']
 for o in meshes:
-    for p in o.data.polygons:
-        p.material_index = 0
     o.data.materials.clear()
-    o.data.materials.append(mat)
-
-def action_fcurves(action):
-    """fcurve của action - Blender 4.4+ dùng layered action (layers > strips > channelbags)."""
-    if getattr(action, 'layers', None):
-        return [fc for l in action.layers for s in l.strips for cb in s.channelbags for fc in cb.fcurves]
-    return list(action.fcurves)
 
 # nhân scale vào dữ liệu: scale object gốc rồi apply cho tất cả
 for o in bpy.data.objects:
@@ -62,22 +51,30 @@ for o in bpy.data.objects:
         o.location = o.location * scale
 bpy.context.view_layer.update()
 arm = next((o for o in bpy.data.objects if o.type == 'ARMATURE'), None)
-
-# apply làm xương to theo scale thế giới của armature, nhưng keyframe vị trí xương (đơn vị cũ) thì không -> nhân tay
-if arm:
-    k = arm.matrix_world.to_scale().x
-    for action in bpy.data.actions:
-        for fc in action_fcurves(action):
-            if fc.data_path.endswith('.location'):
-                for kp in fc.keyframe_points:
-                    kp.co[1] *= k
-                    kp.handle_left[1] *= k
-                    kp.handle_right[1] *= k
-                fc.update()
-
 bpy.ops.object.select_all(action='SELECT')
 bpy.context.view_layer.objects.active = arm or (meshes[0] if meshes else None)
 bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+bpy.context.view_layer.update()
+
+# dựng lại cây như mẫu: RootNode > <Tên> (mesh) + <Tên>_Rig (armature), bỏ các empty trung gian của FBX
+root = bpy.data.objects.new('RootNode', None)
+bpy.context.scene.collection.objects.link(root)
+keep = [o for o in meshes + ([arm] if arm else [])]
+for o in keep:
+    mw = o.matrix_world.copy()
+    o.parent = None
+    o.matrix_world = mw
+for o in list(bpy.data.objects):
+    if o is not root and o not in keep:
+        bpy.data.objects.remove(o, do_unlink=True)
+for o in keep:
+    o.parent = root
+if arm:
+    arm.name = base + '_Rig'
+    arm.data.name = base + '_Rig'
+if meshes:
+    meshes[0].name = base
+    meshes[0].data.name = base
 bpy.context.view_layer.update()
 
 pts = [o.matrix_world @ v.co for o in meshes for v in o.data.vertices]
@@ -85,8 +82,8 @@ size = [max(p[i] for p in pts) - min(p[i] for p in pts) for i in range(3)] if pt
 bones = [b.name for b in arm.data.bones] if arm else []
 
 os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
-# xuất cả animation clip (nếu FBX có): Fish.ts bơi procedural khi đủ xương thân, không đủ (vd bạch tuộc) thì phát clip này
-bpy.ops.export_scene.gltf(filepath=out, export_format='GLB', export_animations=True, export_skins=True)
+bpy.ops.export_scene.gltf(filepath=out, export_format='GLB', export_skins=True, export_animations=False,
+                          export_materials='NONE', export_texcoords=True, export_normals=True)
 
 print("RESULT " + json.dumps({
     "name": name,
@@ -95,6 +92,6 @@ print("RESULT " + json.dumps({
     "meshes": len(meshes),
     "bones": len(bones),
     "boneNames": bones,
-    "clips": [a.name for a in bpy.data.actions],
+    "clips": clips,
     "tris": sum(sum(len(p.vertices) - 2 for p in o.data.polygons) for o in meshes),
 }))

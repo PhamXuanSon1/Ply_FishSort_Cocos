@@ -1,6 +1,10 @@
 import { _decorator, Component, Node, Quat, Vec3, SkeletalAnimation, AnimationState, AnimationClip, clamp, clamp01, lerp, inverseLerp, tween, Tween, v3 } from 'cc';
 import { Thing } from '../Thing';
 import { CreatureAnimator } from './CreatureAnimator';
+import { FishAnimConfig } from './FishAnimConfig';
+
+/** Field Unity không phải tham số animation (trạng thái runtime) - không ghi đè lên Fish. */
+const CONFIG_SKIP = new Set(['speed', 'timeOffset', 'randomizeTimeOffset', 'boundsPadding']);
 const { ccclass, property } = _decorator;
 
 const DEG2RAD = Math.PI / 180;
@@ -322,8 +326,12 @@ export class Fish extends Component {
         this.creature = null;
         const skel = this.disableBakedSkinning();
 
+        // tham số bake từ prefab Unity (tool Fishdom Fish Importer): field trùng tên ghi đè property của Fish
+        const config = this.node.getComponentInChildren(FishAnimConfig);
+        if (config) this.applyConfig(config);
+
         // bạch tuộc / cua: animator riêng thay cho sóng thân cá
-        this.creature = CreatureAnimator.tryCreate(this.node);
+        this.creature = CreatureAnimator.tryCreate(this.node, config);
         if (this.creature) {
             this.creature.finish(this.timeOffset, this._speed);
             this.built = true;
@@ -342,6 +350,16 @@ export class Fish extends Component {
 
         this.built = true;
         this.evaluatePhase(this.timeOffset);
+    }
+
+    /** Ghi đè property số của Fish bằng field cùng tên trong prefab Unity (swayAngle, waveLength, finAngle, turnBend...). */
+    private applyConfig(config: FishAnimConfig): void {
+        const params = config.params;
+        const self = this as unknown as Record<string, unknown>;
+        for (const k of Object.keys(params)) {
+            if (CONFIG_SKIP.has(k) || k.startsWith('_') || typeof self[k] !== 'number') continue;
+            self[k] = params[k];
+        }
     }
 
     /**

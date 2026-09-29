@@ -168,7 +168,10 @@ exports.methods = {
 
     updateFishHint() {
         const f = fishList.find((x) => x.name === selected);
-        this.$.fishHint.textContent = f && f.png ? 'Texture: ' + path.basename(f.png) : '';
+        const parts = [];
+        if (f && f.png) parts.push('Texture: ' + path.basename(f.png));
+        if (f && f.unity) parts.push('Animator: ' + f.unity.animator.replace('ProceduralAnimator', '') + ' (' + Object.keys(f.unity.params).length + ' tham số từ ' + path.basename(f.unity.prefab) + ')');
+        this.$.fishHint.textContent = parts.join('  ·  ');
         this.$.fishWarn.textContent = f && f.warning ? '⚠ ' + f.warning : '';
         this.$.fishWarn.classList.toggle('hidden', !(f && f.warning));
         this.loadPreview(false);
@@ -264,6 +267,7 @@ exports.methods = {
             blender: this.$.blender.value.trim(),
             fbx: f.fbx,
             png: f.png,
+            unity: f.unity || null, // prefab Unity: bake tham số animator vào FishAnimConfig
             outName: this.$.outName.value.trim(),
             scale: Number(this.$.scale.value) || 45000,
             slotUuid: this.$.slot.value,

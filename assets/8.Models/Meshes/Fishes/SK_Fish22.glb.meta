@@ -2,15 +2,15 @@
   "ver": "2.3.14",
   "importer": "gltf",
   "imported": true,
-  "uuid": "9453f70c-dc25-4396-b43c-8aafbd62c0ba",
+  "uuid": "4c73f9ca-4456-42bb-8812-70acc8a25997",
   "files": [],
   "subMetas": {
-    "e2349": {
+    "da09c": {
       "importer": "gltf-mesh",
-      "uuid": "9453f70c-dc25-4396-b43c-8aafbd62c0ba@e2349",
+      "uuid": "4c73f9ca-4456-42bb-8812-70acc8a25997@da09c",
       "displayName": "",
-      "id": "e2349",
-      "name": "Mesh.mesh",
+      "id": "da09c",
+      "name": "Fish24.mesh",
       "userData": {
         "gltfIndex": 0,
         "triangleCount": 4096
@@ -25,7 +25,7 @@
     },
     "f8212": {
       "importer": "gltf-skeleton",
-      "uuid": "9453f70c-dc25-4396-b43c-8aafbd62c0ba@f8212",
+      "uuid": "4c73f9ca-4456-42bb-8812-70acc8a25997@f8212",
       "displayName": "",
       "id": "f8212",
       "name": "Fish24_Rig.skeleton",
@@ -40,68 +40,9 @@
       ],
       "subMetas": {}
     },
-    "fd4fc": {
-      "importer": "gltf-embeded-image",
-      "uuid": "9453f70c-dc25-4396-b43c-8aafbd62c0ba@fd4fc",
-      "displayName": "",
-      "id": "fd4fc",
-      "name": "T_Fish24_D.image",
-      "userData": {
-        "gltfIndex": 0,
-        "fixAlphaTransparencyArtifacts": true,
-        "hasAlpha": false,
-        "type": "texture"
-      },
-      "ver": "1.0.3",
-      "imported": true,
-      "files": [
-        ".json",
-        ".png"
-      ],
-      "subMetas": {}
-    },
-    "e39f7": {
-      "importer": "texture",
-      "uuid": "9453f70c-dc25-4396-b43c-8aafbd62c0ba@e39f7",
-      "displayName": "",
-      "id": "e39f7",
-      "name": "UnnamedTexture.texture",
-      "userData": {
-        "wrapModeS": "repeat",
-        "wrapModeT": "repeat",
-        "minfilter": "linear",
-        "magfilter": "linear",
-        "mipfilter": "linear",
-        "anisotropy": 0,
-        "isUuid": true,
-        "imageUuidOrDatabaseUri": "9453f70c-dc25-4396-b43c-8aafbd62c0ba@fd4fc"
-      },
-      "ver": "1.0.22",
-      "imported": true,
-      "files": [
-        ".json"
-      ],
-      "subMetas": {}
-    },
-    "b952c": {
-      "importer": "gltf-material",
-      "uuid": "9453f70c-dc25-4396-b43c-8aafbd62c0ba@b952c",
-      "displayName": "",
-      "id": "b952c",
-      "name": "SK_Fish24.material",
-      "userData": {
-        "gltfIndex": 0
-      },
-      "ver": "1.0.14",
-      "imported": true,
-      "files": [
-        ".json"
-      ],
-      "subMetas": {}
-    },
     "9bc7f": {
       "importer": "gltf-scene",
-      "uuid": "9453f70c-dc25-4396-b43c-8aafbd62c0ba@9bc7f",
+      "uuid": "4c73f9ca-4456-42bb-8812-70acc8a25997@9bc7f",
       "displayName": "",
       "id": "9bc7f",
       "name": "SK_Fish22.prefab",
@@ -117,12 +58,7 @@
     }
   },
   "userData": {
-    "imageMetas": [
-      {
-        "name": "T_Fish24_D",
-        "uri": "9453f70c-dc25-4396-b43c-8aafbd62c0ba@fd4fc"
-      }
-    ],
+    "imageMetas": [],
     "lods": {
       "enable": false,
       "hasBuiltinLOD": false,
@@ -143,20 +79,32 @@
     },
     "assetFinder": {
       "meshes": [
-        "9453f70c-dc25-4396-b43c-8aafbd62c0ba@e2349"
+        "4c73f9ca-4456-42bb-8812-70acc8a25997@da09c"
       ],
       "skeletons": [
-        "9453f70c-dc25-4396-b43c-8aafbd62c0ba@f8212"
+        "4c73f9ca-4456-42bb-8812-70acc8a25997@f8212"
       ],
-      "textures": [
-        "9453f70c-dc25-4396-b43c-8aafbd62c0ba@e39f7"
-      ],
-      "materials": [
-        "9453f70c-dc25-4396-b43c-8aafbd62c0ba@b952c"
-      ],
+      "textures": [],
+      "materials": [],
       "scenes": [
-        "9453f70c-dc25-4396-b43c-8aafbd62c0ba@9bc7f"
+        "4c73f9ca-4456-42bb-8812-70acc8a25997@9bc7f"
       ]
+    },
+    "meshOptimize": {
+      "enable": true,
+      "vertexCache": true,
+      "vertexFetch": true,
+      "overdraw": true
+    },
+    "meshSimplify": {
+      "enable": true,
+      "targetRatio": 1
+    },
+    "meshCompress": {
+      "enable": true,
+      "encode": false,
+      "compress": true,
+      "quantize": true
     }
   }
 }

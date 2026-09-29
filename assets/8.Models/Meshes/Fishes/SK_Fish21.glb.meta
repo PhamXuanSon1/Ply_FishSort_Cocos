@@ -2,17 +2,15 @@
   "ver": "2.3.14",
   "importer": "gltf",
   "imported": true,
-  "uuid": "4c09dd24-5519-48dd-8beb-9507ecfa36b9",
-  "files": [
-    "__original-animation-0.bin"
-  ],
+  "uuid": "58d263f0-5a88-4cdb-9aed-01dd176d0034",
+  "files": [],
   "subMetas": {
-    "80c75": {
+    "1e96d": {
       "importer": "gltf-mesh",
-      "uuid": "4c09dd24-5519-48dd-8beb-9507ecfa36b9@80c75",
+      "uuid": "58d263f0-5a88-4cdb-9aed-01dd176d0034@1e96d",
       "displayName": "",
-      "id": "80c75",
-      "name": "Mesh.001.mesh",
+      "id": "1e96d",
+      "name": "Fish21.mesh",
       "userData": {
         "gltfIndex": 0,
         "triangleCount": 2936
@@ -25,32 +23,9 @@
       ],
       "subMetas": {}
     },
-    "73b7f": {
-      "importer": "gltf-animation",
-      "uuid": "4c09dd24-5519-48dd-8beb-9507ecfa36b9@73b7f",
-      "displayName": "",
-      "id": "73b7f",
-      "name": "Take 001.animation",
-      "userData": {
-        "gltfIndex": 0,
-        "wrapMode": 2,
-        "sample": 30,
-        "span": {
-          "from": 0,
-          "to": 1.2916666269302368
-        },
-        "events": []
-      },
-      "ver": "1.0.18",
-      "imported": true,
-      "files": [
-        ".bin"
-      ],
-      "subMetas": {}
-    },
     "334c1": {
       "importer": "gltf-skeleton",
-      "uuid": "4c09dd24-5519-48dd-8beb-9507ecfa36b9@334c1",
+      "uuid": "58d263f0-5a88-4cdb-9aed-01dd176d0034@334c1",
       "displayName": "",
       "id": "334c1",
       "name": "Fish21_Rig.skeleton",
@@ -65,70 +40,11 @@
       ],
       "subMetas": {}
     },
-    "df4a5": {
-      "importer": "gltf-embeded-image",
-      "uuid": "4c09dd24-5519-48dd-8beb-9507ecfa36b9@df4a5",
-      "displayName": "",
-      "id": "df4a5",
-      "name": "T_Fish21_D.image",
-      "userData": {
-        "gltfIndex": 0,
-        "fixAlphaTransparencyArtifacts": true,
-        "hasAlpha": false,
-        "type": "texture"
-      },
-      "ver": "1.0.3",
-      "imported": true,
-      "files": [
-        ".json",
-        ".png"
-      ],
-      "subMetas": {}
-    },
-    "e39f7": {
-      "importer": "texture",
-      "uuid": "4c09dd24-5519-48dd-8beb-9507ecfa36b9@e39f7",
-      "displayName": "",
-      "id": "e39f7",
-      "name": "UnnamedTexture.texture",
-      "userData": {
-        "wrapModeS": "repeat",
-        "wrapModeT": "repeat",
-        "minfilter": "linear",
-        "magfilter": "linear",
-        "mipfilter": "linear",
-        "anisotropy": 0,
-        "isUuid": true,
-        "imageUuidOrDatabaseUri": "4c09dd24-5519-48dd-8beb-9507ecfa36b9@df4a5"
-      },
-      "ver": "1.0.22",
-      "imported": true,
-      "files": [
-        ".json"
-      ],
-      "subMetas": {}
-    },
-    "3e44e": {
-      "importer": "gltf-material",
-      "uuid": "4c09dd24-5519-48dd-8beb-9507ecfa36b9@3e44e",
-      "displayName": "",
-      "id": "3e44e",
-      "name": "SK_Fish21.material",
-      "userData": {
-        "gltfIndex": 0
-      },
-      "ver": "1.0.14",
-      "imported": true,
-      "files": [
-        ".json"
-      ],
-      "subMetas": {}
-    },
-    "cdbfc": {
+    "8cf0e": {
       "importer": "gltf-scene",
-      "uuid": "4c09dd24-5519-48dd-8beb-9507ecfa36b9@cdbfc",
+      "uuid": "58d263f0-5a88-4cdb-9aed-01dd176d0034@8cf0e",
       "displayName": "",
-      "id": "cdbfc",
+      "id": "8cf0e",
       "name": "SK_Fish21.prefab",
       "userData": {
         "gltfIndex": 0
@@ -142,12 +58,7 @@
     }
   },
   "userData": {
-    "imageMetas": [
-      {
-        "name": "T_Fish21_D",
-        "uri": "4c09dd24-5519-48dd-8beb-9507ecfa36b9@df4a5"
-      }
-    ],
+    "imageMetas": [],
     "lods": {
       "enable": false,
       "hasBuiltinLOD": false,
@@ -168,36 +79,32 @@
     },
     "assetFinder": {
       "meshes": [
-        "4c09dd24-5519-48dd-8beb-9507ecfa36b9@80c75"
+        "58d263f0-5a88-4cdb-9aed-01dd176d0034@1e96d"
       ],
       "skeletons": [
-        "4c09dd24-5519-48dd-8beb-9507ecfa36b9@334c1"
+        "58d263f0-5a88-4cdb-9aed-01dd176d0034@334c1"
       ],
-      "textures": [
-        "4c09dd24-5519-48dd-8beb-9507ecfa36b9@e39f7"
-      ],
-      "materials": [
-        "4c09dd24-5519-48dd-8beb-9507ecfa36b9@3e44e"
-      ],
+      "textures": [],
+      "materials": [],
       "scenes": [
-        "4c09dd24-5519-48dd-8beb-9507ecfa36b9@cdbfc"
+        "58d263f0-5a88-4cdb-9aed-01dd176d0034@8cf0e"
       ]
     },
-    "animationImportSettings": [
-      {
-        "name": "Take 001",
-        "duration": 1.2916666269302368,
-        "fps": 30,
-        "splits": [
-          {
-            "name": "Take 001",
-            "from": 0,
-            "to": 1.2916666269302368,
-            "wrapMode": 2,
-            "previousId": "73b7f"
-          }
-        ]
-      }
-    ]
+    "meshOptimize": {
+      "enable": true,
+      "vertexCache": true,
+      "vertexFetch": true,
+      "overdraw": true
+    },
+    "meshSimplify": {
+      "enable": true,
+      "targetRatio": 1
+    },
+    "meshCompress": {
+      "enable": true,
+      "encode": false,
+      "compress": true,
+      "quantize": true
+    }
   }
 }
