@@ -1,0 +1,219 @@
+[
+  {
+    "__type__": "cc.Prefab",
+    "_name": "MatCustom",
+    "_objFlags": 0,
+    "__editorExtras__": {},
+    "_native": "",
+    "data": {
+      "__id__": 1
+    },
+    "optimizationPolicy": 0,
+    "persistent": false
+  },
+  {
+    "__type__": "cc.Node",
+    "_name": "MatCustom",
+    "_objFlags": 0,
+    "__editorExtras__": {},
+    "_parent": null,
+    "_children": [],
+    "_active": true,
+    "_components": [
+      {
+        "__id__": 2
+      }
+    ],
+    "_prefab": {
+      "__id__": 5
+    },
+    "_lpos": {
+      "__type__": "cc.Vec3",
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "_lrot": {
+      "__type__": "cc.Quat",
+      "x": 0,
+      "y": 0,
+      "z": 0,
+      "w": 1
+    },
+    "_lscale": {
+      "__type__": "cc.Vec3",
+      "x": 1,
+      "y": 1,
+      "z": 1
+    },
+    "_mobility": 0,
+    "_layer": 1073741824,
+    "_euler": {
+      "__type__": "cc.Vec3",
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "_id": ""
+  },
+  {
+    "__type__": "cf9951s/FxMhKPe9KRUl+vA",
+    "_name": "",
+    "_objFlags": 0,
+    "__editorExtras__": {},
+    "node": {
+      "__id__": 1
+    },
+    "_enabled": true,
+    "__prefab": {
+      "__id__": 3
+    },
+    "dragMouseHearToSeeGuide": false,
+    "dis": {
+      "__type__": "cc.Vec2",
+      "x": 1,
+      "y": 1
+    },
+    "fileName": "Box",
+    "jsonData": null,
+    "mat": {
+      "__uuid__": "a0ca44f5-84ab-4a89-850b-6ab031c7c519",
+      "__expectedType__": "cc.Material"
+    },
+    "useColor": false,
+    "colors": [
+      {
+        "__type__": "cc.Color",
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 255
+      },
+      {
+        "__type__": "cc.Color",
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 255
+      },
+      {
+        "__type__": "cc.Color",
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 255
+      }
+    ],
+    "useTexture": true,
+    "textures": [
+      {
+        "__uuid__": "1c77167b-e2e4-47af-b874-958f184a3cc7@6c48a",
+        "__expectedType__": "cc.Texture2D"
+      },
+      null,
+      {
+        "__uuid__": "dc4fe5ed-072b-494b-ad13-164c7bac2ca2@6c48a",
+        "__expectedType__": "cc.Texture2D"
+      },
+      null,
+      null,
+      null,
+      {
+        "__uuid__": "f3bd1b4a-86ca-4e87-89c0-a9016db41e1a@6c48a",
+        "__expectedType__": "cc.Texture2D"
+      },
+      null,
+      {
+        "__uuid__": "d17505e3-b95d-438b-8995-b457dbce31d8@6c48a",
+        "__expectedType__": "cc.Texture2D"
+      },
+      {
+        "__uuid__": "468cbe2e-749b-4169-92b3-a42aed3ecfb0@6c48a",
+        "__expectedType__": "cc.Texture2D"
+      },
+      {
+        "__uuid__": "e68b8fa8-addd-4b29-9fd9-2f0795b7c74a@6c48a",
+        "__expectedType__": "cc.Texture2D"
+      },
+      null,
+      null,
+      null,
+      null,
+      null,
+      {
+        "__uuid__": "e82e9799-83ff-428f-9848-95a88f1d97a4@6c48a",
+        "__expectedType__": "cc.Texture2D"
+      },
+      {
+        "__uuid__": "29e10deb-8753-4366-bf4b-1208e5d544a0@6c48a",
+        "__expectedType__": "cc.Texture2D"
+      },
+      null,
+      null
+    ],
+    "useNormalMap": false,
+    "normalMaps": [],
+    "clamBrightness": true,
+    "brightness": 0,
+    "contrast": 1,
+    "saturation": 1,
+    "hue": 0,
+    "roughness": 0.85,
+    "metallic": 0.59,
+    "specularIntensity": 0.44,
+    "fixedLighting": true,
+    "light": 0.5,
+    "ao": 0.7,
+    "selfEmissive": false,
+    "emissive": {
+      "__type__": "cc.Color",
+      "r": 0,
+      "g": 0,
+      "b": 0,
+      "a": 255
+    },
+    "emissiveScale": 1,
+    "enableGlow": false,
+    "selfGlow": false,
+    "glowColor": {
+      "__type__": "cc.Color",
+      "r": 255,
+      "g": 224,
+      "b": 0,
+      "a": 255
+    },
+    "glowDark": 0,
+    "useOutline": true,
+    "lineWidth": 0,
+    "defaultMats": [],
+    "onColorChangeds": [
+      {
+        "__id__": 4
+      }
+    ],
+    "_id": ""
+  },
+  {
+    "__type__": "cc.CompPrefabInfo",
+    "fileId": "e778FESxxFdrmzrih3NP6P"
+  },
+  {
+    "__type__": "cc.ClickEvent",
+    "target": null,
+    "component": "",
+    "_componentId": "",
+    "handler": "",
+    "customEventData": ""
+  },
+  {
+    "__type__": "cc.PrefabInfo",
+    "root": {
+      "__id__": 1
+    },
+    "asset": {
+      "__id__": 0
+    },
+    "fileId": "a0f0pEe0tAgIQrViJrTqqq",
+    "targetOverrides": null
+  }
+]

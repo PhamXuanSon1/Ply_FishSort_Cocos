@@ -4,7 +4,12 @@
  *   Editor.Message.request('scene', 'execute-scene-script', { name: 'fishdom-importer', method, args })
  * Chỉ ĐỌC scene (liệt kê slot, đo mesh); mọi thay đổi đều đi qua message 'scene' ở main.js để có undo + lưu đúng.
  */
-const { director, Node, SkinnedMeshRenderer, Mat4, Vec3 } = require('cc');
+const { director, Node, MeshRenderer, SkinnedMeshRenderer, Mat4, Vec3 } = require('cc');
+
+/** Renderer của model: ưu tiên SkinnedMeshRenderer (cá có xương), không có thì MeshRenderer (model tĩnh). */
+function findRenderer(node) {
+    return node.getComponentInChildren(SkinnedMeshRenderer) || node.getComponentInChildren(MeshRenderer);
+}
 
 function walk(node, fn) {
     fn(node);
@@ -37,7 +42,7 @@ function findMats() {
     return result;
 }
 
-/** Bounds mesh sau skinning (CPU) trong local space của `space`. */
+/** Bounds mesh sau skinning (CPU) trong local space của `space`; model tĩnh thì theo worldMatrix của node mesh. */
 function skinnedBounds(renderer, space) {
     const skel = renderer.skeleton;
     const root = renderer.skinningRoot || renderer.node;
@@ -108,14 +113,14 @@ exports.methods = {
 
     /**
      * Đo cá vừa đặt vào slot: tâm mesh (local slot), hướng đầu (+Z/-Z theo bone "head" so với tâm),
-     * và node chứa SkinnedMeshRenderer để main.js để trống material.
+     * và node chứa renderer (SkinnedMeshRenderer, hoặc MeshRenderer với model tĩnh) để main.js để trống material.
      */
     measure(slotUuid, childUuid) {
         const slot = findByUuid(slotUuid);
         const child = findByUuid(childUuid);
         if (!slot || !child) throw new Error('Không tìm thấy node slot / cá vừa tạo');
-        const renderer = child.getComponentInChildren(SkinnedMeshRenderer);
-        if (!renderer || !renderer.mesh) throw new Error('Cá không có SkinnedMeshRenderer');
+        const renderer = findRenderer(child);
+        if (!renderer || !renderer.mesh) throw new Error('Cá không có MeshRenderer / SkinnedMeshRenderer');
         const b = skinnedBounds(renderer, slot);
 
         // chỉ xoay theo bone head với cá (>= 2 xương thân, bơi ngang); cua / bạch tuộc... giữ mặt nhìn camera như model gốc
@@ -145,6 +150,7 @@ exports.methods = {
             childRotation: [child.eulerAngles.x, child.eulerAngles.y, child.eulerAngles.z],
             meshNode: renderer.node.uuid,
             meshCompIndex: renderer.node.components.indexOf(renderer),
+            skinned: renderer instanceof SkinnedMeshRenderer,
             slots: renderer.sharedMaterials.length,
             materials: renderer.sharedMaterials.map((m) => (m ? m.name : null)),
             slotLayer: slot.layer,
@@ -161,18 +167,19 @@ exports.methods = {
 
     /**
      * Prefab GLB vừa tạo = <tên file> [SkeletalAnimation] > RootNode > mesh + rig. Cá mẫu chỉ giữ RootNode trong slot:
-     * trả về RootNode + SkinnedMeshRenderer (để trỏ skinningRoot về slot sau khi bỏ lớp bọc).
+     * trả về RootNode + renderer (để trỏ skinningRoot về slot sau khi bỏ lớp bọc - chỉ với SkinnedMeshRenderer).
      */
     unwrapInfo(wrapperUuid) {
         const wrapper = findByUuid(wrapperUuid);
         if (!wrapper) throw new Error('Không tìm thấy node vừa tạo');
         const inner = wrapper.children.length === 1 ? wrapper.children[0] : null;
-        const renderer = wrapper.getComponentInChildren(SkinnedMeshRenderer);
+        const renderer = findRenderer(wrapper);
         return {
             inner: inner ? inner.uuid : null,
             innerScale: inner ? inner.scale.x : 1,
             meshNode: renderer ? renderer.node.uuid : null,
             meshCompIndex: renderer ? renderer.node.components.indexOf(renderer) : -1,
+            skinned: renderer instanceof SkinnedMeshRenderer,
         };
     },
 
@@ -189,7 +196,7 @@ exports.methods = {
         return {
             fishRoot: root ? { uuid: root.uuid, layer: root.children[0] ? root.children[0].layer : root.layer } : null,
             slots: root ? root.children.map((s, index) => {
-                const smr = s.getComponentInChildren(SkinnedMeshRenderer);
+                const smr = findRenderer(s);
                 return {
                     index, uuid: s.uuid, name: s.name,
                     model: smr ? smr.node.name : null,

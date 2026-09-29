@@ -232,6 +232,8 @@ async function setupChild(slot, child, report, opts = {}) {
         await setProp(child, 'rotation', { type: 'cc.Vec3', value: { x: 0, y: 180, z: 0 } });
         m = await sceneScript('measure', slot.uuid, child);
         report('Xoay 180° để đầu cá hướng +Z');
+    } else if (!m.skinned) {
+        report('Model tĩnh (MeshRenderer, không có xương) - giữ hướng gốc, Fish.ts sẽ không animate');
     } else if (m.headForward === null) {
         report(m.bodyBones < 2
             ? 'Không phải cá bơi ngang (' + m.bodyBones + ' xương thân) - giữ hướng gốc (mặt nhìn camera)'
@@ -322,7 +324,7 @@ async function placeModel(slot, prefabUuid, name, report, opts = {}) {
         await Editor.Message.request('scene', 'set-parent', { parent: slot.uuid, uuids: [u.inner], keepWorldTransform: false });
         await Editor.Message.request('scene', 'remove-node', { uuid: wrapper });
         child = u.inner;
-        if (u.meshNode) {
+        if (u.meshNode && u.skinned) {
             await setProp(u.meshNode, '__comps__.' + u.meshCompIndex + '.skinningRoot', { type: 'cc.Node', value: { uuid: slot.uuid } });
         }
         if (u.innerScale < 0.1) {

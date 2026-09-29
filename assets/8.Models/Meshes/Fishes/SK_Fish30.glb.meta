@@ -1,0 +1,91 @@
+{
+  "ver": "2.3.14",
+  "importer": "gltf",
+  "imported": true,
+  "uuid": "9d576f44-4c6f-4e8d-9805-7174edc4af49",
+  "files": [],
+  "subMetas": {
+    "08210": {
+      "importer": "gltf-mesh",
+      "uuid": "9d576f44-4c6f-4e8d-9805-7174edc4af49@08210",
+      "displayName": "",
+      "id": "08210",
+      "name": "Fish30.mesh",
+      "userData": {
+        "gltfIndex": 0,
+        "triangleCount": 1060
+      },
+      "ver": "1.1.1",
+      "imported": true,
+      "files": [
+        ".bin",
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "bdd97": {
+      "importer": "gltf-scene",
+      "uuid": "9d576f44-4c6f-4e8d-9805-7174edc4af49@bdd97",
+      "displayName": "",
+      "id": "bdd97",
+      "name": "SK_Fish30.prefab",
+      "userData": {
+        "gltfIndex": 0
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    }
+  },
+  "userData": {
+    "imageMetas": [],
+    "lods": {
+      "enable": false,
+      "hasBuiltinLOD": false,
+      "options": [
+        {
+          "screenRatio": 0.25,
+          "faceCount": 1
+        },
+        {
+          "screenRatio": 0.125,
+          "faceCount": 0.25
+        },
+        {
+          "screenRatio": 0.01,
+          "faceCount": 0.1
+        }
+      ]
+    },
+    "assetFinder": {
+      "meshes": [
+        "9d576f44-4c6f-4e8d-9805-7174edc4af49@08210"
+      ],
+      "skeletons": [],
+      "textures": [],
+      "materials": [],
+      "scenes": [
+        "9d576f44-4c6f-4e8d-9805-7174edc4af49@bdd97"
+      ]
+    },
+    "meshOptimize": {
+      "enable": true,
+      "vertexCache": true,
+      "vertexFetch": true,
+      "overdraw": true
+    },
+    "meshSimplify": {
+      "enable": true,
+      "targetRatio": 1
+    },
+    "meshCompress": {
+      "enable": true,
+      "encode": false,
+      "compress": true,
+      "quantize": true
+    }
+  }
+}

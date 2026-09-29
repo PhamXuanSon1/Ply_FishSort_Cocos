@@ -11,6 +11,8 @@
   "_techIdx": 0,
   "_defines": [
     {
+      "ENABLE_EXPANSION": true,
+      "ENABLE_GLOW": true,
       "USE_ALPHA_TEST": true
     },
     {},
@@ -94,17 +96,18 @@
       "roughness": 1,
       "metallic": 0.8,
       "specularIntensity": 1,
+      "expansion": 300,
       "glowColor": {
         "__type__": "cc.Color",
-        "r": 0,
-        "g": 255,
-        "b": 31,
+        "r": 255,
+        "g": 0,
+        "b": 0,
         "a": 255
       },
-      "glowIntensity": 2.205,
+      "glowIntensity": 10,
       "glowSpeed": 0,
-      "glowFresnel": 1.58,
-      "glowPulseFloor": 0,
+      "glowFresnel": 7.35,
+      "glowPulseFloor": 1,
       "transEdgePower": 7.11
     },
     {},

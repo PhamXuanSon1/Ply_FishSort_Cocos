@@ -30,19 +30,23 @@ export var room: Room = null;
  */
 export const BubbleData: 
 [number, number, number[]][] = 
-[[132.428,1268.46,[3,3]],[-621.029,874.37,[24,24,25]],[620.997,1242.781,[23,23,3]],[-331.329,1268.474,[20,0]],[311.746,840.762,[0,3]],[710.886,827.523,[11]],[710.774,492.52,[20]],[-147.621,672.359,[0,11,23]],[245.951,381.656,[11,20]],[-226.381,189.451,[24,25]],[620.976,67.396,[11,20,3]],[-646.47,385.848,[3,25]],[125.572,0.849,[20]],[-646.417,-77.964,[11,3]],[-181.644,-297.852,[0,20,24]],[-620.956,-566.574,[0,20,11]],[342.884,-253.975,[25]],[101.306,-697.127,[23,11]],[-602.293,-1099.642,[20,25,0,23]],[-56.128,-1180.229,[25,3,11,3]],[602.341,-613.586,[0,0,24,24]],[495.364,-1155.148,[11,0,23,20]]]
+[[132.428,1268.46,[28,28]],[-621.029,874.37,[26,29,0]],[620.997,1242.781,[30,27,29]],[-331.329,1268.474,[0,26]],[311.746,840.762,[0,27]],[710.886,827.523,[0]],[710.774,492.52,[29]],[-147.621,672.359,[23,20,26]],[245.951,381.656,[20,0]],[-226.381,189.451,[27,20]],[620.976,67.396,[29,27,26]],[-646.47,385.848,[20,20]],[125.572,0.849,[29]],[-646.417,-77.964,[28,0]],[-181.644,-297.852,[30,28,27]],[-620.956,-566.574,[30,0,30]],[342.884,-253.975,[27]],[101.306,-697.127,[20,29]],[-602.293,-1099.642,[28,23,0,0]],[-56.128,-1180.229,[26,23,30,20]],[602.341,-613.586,[30,28,26,20]],[495.364,-1155.148,[20,23,23,23]]]
 
 export const Items = [ 
-  [ 3, 3, 3 ],    [ 0, 0, 0 ],
-  [ 20, 20, 20 ], [ 11, 11, 11 ],
-  [ 23, 23, 23 ], [ 24, 24, 24 ],
-  [ 25, 25, 25 ], [ 3, 3, 3 ],
-  [ 0, 0, 0 ],    [ 20, 20, 20 ],
-  [ 11, 11, 11 ], [ 23, 23, 23 ],
-  [ 24, 24, 24 ], [ 25, 25, 25 ],
-  [ 3, 3, 3 ],    [ 0, 0, 0 ],
-  [ 20, 20, 20 ], [ 11, 11, 11 ]
-]
+  [ 26, 26, 26 ],  [ 30, 30, 30 ],
+
+  [ 28, 28, 28 ],  [ 23, 23, 23 ],
+
+  [ 27, 27, 27 ],  [ 23, 23, 23 ],
+
+  [ 0, 0, 0 ],     [ 29, 29, 29 ],
+
+  [ 26, 26, 26 ],  [ 29, 29, 29 ],
+  [ 20, 20, 20 ],  [ 20, 20, 20 ],
+  [ 27, 27, 27 ],  [ 28, 28, 28 ],
+  [ 20, 20, 20 ],  [ 0, 0, 0 ],
+  [ 0, 0, 0 ],     [ 30, 30, 30 ] 
+] 
 
 
 
@@ -105,7 +109,7 @@ export class Room extends Component {
     maxMoveX: number = 400;
     maxMoveY: number = 200;
     hintTween: Tween<any> = null;
-    fisrtTapCount: number = 3;
+    fisrtTapCount: number = 1;
 
     items: number[][] = [];
 
@@ -535,6 +539,7 @@ export class Room extends Component {
 
     hint() {
         this.hintTween?.stop();
+        if(this.lose || this.bound) return;
         this.hintTween = tween({})
         .delay(5)
         .call(() => {
@@ -837,11 +842,12 @@ export class Room extends Component {
 
         try {
             if(!EDITOR_NOT_IN_PREVIEW) {
-                this.taps = [];
-                let t0 = Items[0][0];
-                console.log(t0);                
-                let things = this.things.filter(t => t.thingType == t0);
-                this.taps = things.map(t => t.node).splice(0, 3);
+                // Tutorial: point once at the fish nearest the middle of the field whose type
+                // already has a slot, so the first tap always sorts instead of filling a box.
+                let center = this.thingNode.worldPosition;
+                let things = this.things.filter(t => this.slots.some(s => s.thingType == t.thingType));
+                things.sort((a, b) => Vec3.squaredDistance(a.node.worldPosition, center) - Vec3.squaredDistance(b.node.worldPosition, center));
+                this.taps = things.slice(0, 1).map(t => t.node);
             }
             // .reverse();
             
@@ -964,9 +970,13 @@ export class Room extends Component {
         }
     }
 
+    bound: boolean = false;
     onBind() {
         console.log("bind");
         
+        this.bound = true;
+        this.hintTween?.stop();
+        ui.offHand();
         this.things.forEach((t) => t.offTouch());
         ui.bindingToStore();
     }
@@ -1170,7 +1180,13 @@ export class Room extends Component {
     click: boolean = false;
     onTouchStart(event: EventTouch) {
         if(!event) return;
-        this.location = event.getUILocation(); 
+        // Any touch after the opening tutorial hides the hint and restarts the 5s idle timer.
+        if(this.fisrtTapCount <= 0 && this.tappable && !this.lose) {
+            ui.offHand();
+            this.taps = [];
+            this.hint();
+        }
+        this.location = event.getUILocation();
         if(this.s1 == null) {
             this.s1 = this.location.clone();
         } else if(this.s2 == null) {

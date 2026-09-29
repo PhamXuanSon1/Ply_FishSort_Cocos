@@ -39,13 +39,14 @@ CCEffect %{
         root: {value : [0.0, 0.0, 0.0, 0.0]}
         normal: {value : [0.0, 0.0, 0.0, 0.0]}
 
-        expansion: { value: 1.0, editor: { parent: ENABLE_EXPANSION, slide: true, range: [0.0, 10.0], step: 0.001 } }
+        expansion: { value: 1.0, editor: { parent: ENABLE_EXPANSION, slide: true, range: [0.0, 10000.0], step: 0.001 } }
 
         glowColor:     { value: [0.0, 1.0, 1.0, 1.0], linear: true, editor: { parent: ENABLE_GLOW, displayName: "Glow Color", type: color } }
         glowIntensity: { value: 1.0, target: glowParams.x, editor: { parent: ENABLE_GLOW, displayName: "Glow Intensity", slide: true, range: [0.0, 10.0], step: 0.001 } }
         glowSpeed:     { value: 2.0, target: glowParams.y, editor: { parent: ENABLE_GLOW, displayName: "Glow Speed", slide: true, range: [0.0, 20.0], step: 0.01 } }
         glowFresnel:   { value: 2.0, target: glowParams.z, editor: { parent: ENABLE_GLOW, displayName: "Glow Fresnel Power", slide: true, range: [0.1, 8.0], step: 0.01 } }
         glowPulseFloor: { value: 0.4, target: glowParams.w, editor: { parent: ENABLE_GLOW, displayName: "Glow Pulse Floor", tooltip: "0 = nhap nhay tat/mo hoan toan, 1 = sang dat khong nhap nhay", slide: true, range: [0.0, 1.0], step: 0.001 } }
+        glowTexture:   { value: white, editor: { parent: ENABLE_GLOW, displayName: "Glow Texture" } }
 
         transEdgePower: { value: 2.0, target: edgeParams.x, editor: { parent: ENABLE_TRANS_EDGE, displayName: "Trans Edge Power", tooltip: "So mu falloff: cang lon vien tan bien cang nhanh/hep", slide: true, range: [0.1, 8.0], step: 0.01 } }
         transEdgeMin:   { value: 0.0, target: edgeParams.y, editor: { parent: ENABLE_TRANS_EDGE, displayName: "Trans Edge Min Alpha", tooltip: "Alpha con lai o dung mep silhouette: 0 = trong suot hoan toan", slide: true, range: [0.0, 1.0], step: 0.001 } }
@@ -379,6 +380,9 @@ CCProgram surface-fragment %{
     uniform sampler2D anisotropyMap;
     uniform sampler2D anisotropyMapNearestFilter;
   #endif
+  #if ENABLE_GLOW
+    uniform sampler2D glowTexture;
+  #endif
 
   #pragma define OCCLUSION_CHANNEL          r
   #pragma define ROUGHNESS_CHANNEL          g
@@ -415,6 +419,7 @@ CCProgram surface-fragment %{
 
   #pragma define-meta CLAMP_BRIGHTNESS
   #pragma define-meta ENABLE_TRANS_EDGE
+  #pragma define-meta USE_GLOW_TEXTURE 
   vec4 SurfacesFragmentModifyBaseColorAndTransparency()
   {
     vec4 baseColor = albedo;
@@ -468,9 +473,15 @@ CCProgram surface-fragment %{
       float pulse = mix(glowParams.w, 1.0, 0.5 + 0.5 * sin(cc_time.x * glowParams.y));
       float glowAmount = fresnel * pulse;
 
+      vec3 glowTint = SRGBToLinear(glowColor.rgb);
+
+      #if USE_GLOW_TEXTURE 
+        glowTint = SRGBToLinear(texture(glowTexture, ALBEDO_UV).rgb);
+      #endif
+
       // material transparent co alpha thap => cong mau glow vao baseColor va day alpha len theo vien
       // de glow khong bi mo/mat do bi nhan voi alpha thap khi blend
-      baseColor.rgb += SRGBToLinear(glowColor.rgb) * glowParams.x * glowAmount;
+      baseColor.rgb += glowTint * glowParams.x * glowAmount;
       baseColor.a = max(baseColor.a, glowAmount);
     #endif
 
@@ -621,11 +632,11 @@ CCProgram surface-fragment %{
   {
 
     #if FIXED_LIGHTING  
-      surfaceData.specularIntensity = 0.0;
-      surfaceData.roughness = 1.0;
-      surfaceData.metallic = 0.0;
+      // surfaceData.specularIntensity = 0.0;
+      // surfaceData.roughness = 1.0;
+      // surfaceData.metallic = 0.0;
       surfaceData.ao = 1.0;
-      surfaceData.emissive = vec3(0.0);
+      // surfaceData.emissive = vec3(0.0);
     #endif
     
 
