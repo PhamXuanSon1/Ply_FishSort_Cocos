@@ -1,0 +1,39 @@
+{
+  "package_version": 2,
+  "name": "fishdom-importer",
+  "version": "1.0.0",
+  "description": "Chuyển cá Fishdom (FBX + PNG) sang GLB bằng Blender rồi đặt vào node SK_Fish trong Room > Fish, sẵn material/texture như các cá khác.",
+  "author": "PLY",
+  "editor": ">=3.8.0",
+  "main": "./main.js",
+  "panels": {
+    "default": {
+      "title": "Fishdom Fish Importer",
+      "type": "dockable",
+      "main": "./src/panels/default.js",
+      "size": {
+        "min-width": 480,
+        "min-height": 420,
+        "width": 620,
+        "height": 760
+      }
+    }
+  },
+  "contributions": {
+    "scene": {
+      "script": "./scene.js"
+    },
+    "menu": [
+      { "path": "Tool", "label": "Fishdom Fish Importer", "message": "open-panel" }
+    ],
+    "messages": {
+      "open-panel": { "methods": ["openPanel"] },
+      "detect-blender": { "methods": ["detectBlender"] },
+      "list-fish": { "methods": ["listFish"] },
+      "list-slots": { "methods": ["listSlots"] },
+      "preview-fish": { "methods": ["previewFish"] },
+      "import-fish": { "methods": ["importFish"] },
+      "fix-slot": { "methods": ["fixSlot"] }
+    }
+  }
+}

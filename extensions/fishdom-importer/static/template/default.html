@@ -1,0 +1,74 @@
+<div id="app">
+    <header>
+        <h2>Fishdom Fish Importer</h2>
+        <span class="hint">Chuyển 1 con cá Fishdom (FBX + PNG) sang GLB bằng Blender, rồi đặt vào slot <b>SK_FishN</b> trong <b>Room &rarr; Fish</b>: xoay đầu về +Z, canh tâm, để trống material và gán <b>Mats.textures[N]</b>. Mở <b>PlayScene</b> trước khi chạy.</span>
+    </header>
+
+    <section class="form">
+        <h3>1. Blender</h3>
+        <div class="row">
+            <ui-input id="blender" class="grow" placeholder="C:\Program Files\Blender Foundation\Blender x.y\blender.exe"></ui-input>
+            <ui-button id="detect">Detect</ui-button>
+        </div>
+        <span class="hint indent">Cần Blender 4.5 trở lên (đọc được FBX dạng ASCII của Fishdom).</span>
+
+        <h3>2. Con cá</h3>
+        <div class="row">
+            <ui-input id="folder" class="grow" placeholder="F:\AssetFish\Graphics\Graphics\FishdomFish"></ui-input>
+            <ui-button id="reloadFish">&#8635;</ui-button>
+        </div>
+        <div class="row">
+            <ui-input id="filter" class="grow" placeholder="Lọc theo tên..."></ui-input>
+            <span id="gridInfo" class="hint"></span>
+        </div>
+        <div id="grid" class="grid"></div>
+        <div id="fishHint" class="hint indent"></div>
+        <div id="fishWarn" class="warn hidden"></div>
+        <div class="preview-box">
+            <img id="preview" class="hidden">
+            <span id="previewMsg" class="hint">Chọn cá để xem trước</span>
+            <ui-button id="rerender" class="rerender" tooltip="Render lại ảnh xem trước">&#8635;</ui-button>
+        </div>
+
+        <h3>3. Đầu ra</h3>
+        <ui-prop>
+            <ui-label slot="label" value="Tên GLB"></ui-label>
+            <ui-input slot="content" id="outName" class="grow" placeholder="SK_Fish22"></ui-input>
+        </ui-prop>
+        <ui-prop>
+            <ui-label slot="label" value="Scale"></ui-label>
+            <div slot="content" class="row">
+                <ui-num-input id="scale" class="grow" value="45000" min="1" step="1000"></ui-num-input>
+                <ui-button id="autoScale" tooltip="Tính scale để cạnh dài nhất ≈ 8000, cỡ cá mẫu trong project">Tự tính</ui-button>
+            </div>
+        </ui-prop>
+        <div id="sizeHint" class="hint indent"></div>
+
+        <h3>4. Đặt vào scene</h3>
+        <ui-prop>
+            <ui-label slot="label" value="Slot"></ui-label>
+            <div slot="content" class="row">
+                <ui-select id="slot" class="grow"></ui-select>
+                <ui-button id="reloadSlots">&#8635;</ui-button>
+            </div>
+        </ui-prop>
+        <div id="slotHint" class="hint indent"></div>
+        <ui-prop>
+            <ui-label slot="label" value="Xoá con cũ của slot"></ui-label>
+            <ui-checkbox slot="content" id="replace" value="true"></ui-checkbox>
+        </ui-prop>
+        <ui-prop>
+            <ui-label slot="label" value="Lưu scene"></ui-label>
+            <ui-checkbox slot="content" id="save" value="true"></ui-checkbox>
+        </ui-prop>
+
+        <div class="row actions">
+            <ui-button id="run" type="primary">Import</ui-button>
+            <ui-button id="fixSlot" tooltip="Không import lại: chuẩn hoá model đang có trong slot (layer UI_2D, hướng, canh tâm, bỏ material gốc)">Sửa slot</ui-button>
+            <span class="grow"></span>
+            <span id="status" class="hint"></span>
+        </div>
+    </section>
+
+    <pre id="log" class="panel hidden"></pre>
+</div>
