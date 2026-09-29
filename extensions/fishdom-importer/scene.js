@@ -170,9 +170,54 @@ exports.methods = {
         const renderer = wrapper.getComponentInChildren(SkinnedMeshRenderer);
         return {
             inner: inner ? inner.uuid : null,
+            innerScale: inner ? inner.scale.x : 1,
             meshNode: renderer ? renderer.node.uuid : null,
             meshCompIndex: renderer ? renderer.node.components.indexOf(renderer) : -1,
         };
+    },
+
+    // ---------------- Fish Level Setup ----------------
+
+    /** Trạng thái level: slot (model đang đặt), Room.fishTypes, bubble đang có trong scene. */
+    levelInfo() {
+        const root = findFishRoot();
+        let room = null;
+        walk(director.getScene(), (n) => {
+            if (!room) room = n.components.find((c) => c.constructor && c.constructor.name === 'Room') || null;
+        });
+        const bubbles = room && room.thingNode ? room.thingNode.children.filter((c) => c.components.some((k) => k.constructor && k.constructor.name === 'Bubble')) : [];
+        return {
+            fishRoot: root ? { uuid: root.uuid, layer: root.children[0] ? root.children[0].layer : root.layer } : null,
+            slots: root ? root.children.map((s, index) => {
+                const smr = s.getComponentInChildren(SkinnedMeshRenderer);
+                return {
+                    index, uuid: s.uuid, name: s.name,
+                    model: smr ? smr.node.name : null,
+                    mesh: smr && smr.mesh ? smr.mesh._uuid.split('@')[0] : null,
+                    children: s.children.map((c) => c.uuid),
+                    rot: [s.eulerAngles.x, s.eulerAngles.y, s.eulerAngles.z],
+                };
+            }) : [],
+            room: room ? { uuid: room.node.uuid, compIndex: room.node.components.indexOf(room), fishTypes: (room.fishTypes || []).slice() } : null,
+            bubbles: bubbles.length,
+            bubbleFish: bubbles.reduce((sum, b) => {
+                let n = 0;
+                walk(b, (x) => { if (x.components.some((k) => k.constructor && k.constructor.name === 'Thing')) n++; });
+                return sum + n;
+            }, 0),
+        };
+    },
+
+    /** Room.randomFromAvailableBubbles(types): giữ vị trí + cỡ bubble đang có, chia lại loại cá (như nút Gen Buble From Avai). */
+    genBubbles(types) {
+        let room = null;
+        walk(director.getScene(), (n) => {
+            if (!room) room = n.components.find((c) => c.constructor && c.constructor.name === 'Room') || null;
+        });
+        if (!room) throw new Error('Không thấy component Room trong scene');
+        const data = room.randomFromAvailableBubbles(types);
+        const r3 = (v) => Math.round(v * 1000) / 1000;
+        return data.map(([x, y, t]) => [r3(x), r3(y), t]);
     },
 
     /** Con đầu tiên của slot (model cá đã đặt), để "sửa slot" không cần import lại. */

@@ -1,0 +1,51 @@
+<div id="app">
+    <header>
+        <h2>Fish Level Setup</h2>
+        <span class="hint">Chọn những con cá được chơi rồi bấm <b>Áp dụng</b>: tool đặt model vào slot <b>Room &rarr; Fish &rarr; SK_Fish&lt;loại&gt;</b>,
+            gán texture trong <b>MatCustom</b>, ghi <b>Room.fishTypes</b>, chia lại loại cá cho các bubble đang có (như <i>Gen Buble From Avai</i>),
+            ghi thẳng <b>BubbleData</b> + <b>Items</b> vào <b>Room.ts</b> rồi nạp lại scene. Mở <b>PlayScene</b> trước.</span>
+    </header>
+
+    <section class="form">
+        <div class="row">
+            <h3 class="grow">Cá trong project <span id="summary" class="hint"></span></h3>
+            <ui-button id="reload" tooltip="Đọc lại Assets + scene">&#8635;</ui-button>
+        </div>
+        <div class="row">
+            <ui-button id="selPlaying">Chọn cá đang chơi</ui-button>
+            <ui-button id="selNone">Bỏ chọn hết</ui-button>
+            <span class="grow"></span>
+            <span id="gridInfo" class="hint"></span>
+        </div>
+        <div id="grid" class="grid level-grid"></div>
+        <div id="selection" class="hint indent"></div>
+
+        <h3>Tuỳ chọn</h3>
+        <ui-prop>
+            <ui-label slot="label" value="Gen bubble + ghi Room.ts"></ui-label>
+            <ui-checkbox slot="content" id="regen" value="true"></ui-checkbox>
+        </ui-prop>
+        <div class="hint indent">Giữ vị trí + cỡ các bubble đang có trong scene, chia lại loại cá thành nhóm 3 xoay vòng theo danh sách chọn;
+            BubbleData + Items trong Room.ts được thay bằng kết quả mới.</div>
+        <ui-prop>
+            <ui-label slot="label" value="Dọn model ở slot không chọn"></ui-label>
+            <ui-checkbox slot="content" id="clearUnused" value="true"></ui-checkbox>
+        </ui-prop>
+        <ui-prop>
+            <ui-label slot="label" value="Lưu scene"></ui-label>
+            <ui-checkbox slot="content" id="save" value="true"></ui-checkbox>
+        </ui-prop>
+        <div class="row">
+            <span class="hint">Blender (render ảnh):</span>
+            <ui-input id="blender" class="grow"></ui-input>
+        </div>
+
+        <div class="row actions">
+            <ui-button id="apply" type="primary">Áp dụng</ui-button>
+            <span class="grow"></span>
+            <span id="status" class="hint"></span>
+        </div>
+    </section>
+
+    <pre id="log" class="panel hidden"></pre>
+</div>

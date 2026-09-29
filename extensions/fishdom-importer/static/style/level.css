@@ -1,0 +1,42 @@
+.level-grid {
+    grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+    max-height: 520px;
+}
+
+.level-grid .card {
+    position: relative;
+    opacity: 0.55;
+}
+
+.level-grid .card.picked {
+    opacity: 1;
+    border-color: var(--color-primary-fill, #2e88fb);
+}
+
+.level-grid .card .check {
+    position: absolute;
+    top: 4px;
+    left: 6px;
+    font-size: 14px;
+    color: var(--color-primary-fill, #2e88fb);
+}
+
+.level-grid .card .meta {
+    font-size: 10px;
+    color: var(--color-normal-contrast-weakest, #888);
+    text-align: center;
+    line-height: 1.4;
+}
+
+.level-grid .card .badge {
+    display: inline-block;
+    padding: 0 4px;
+    border-radius: 3px;
+    background: #2d5a2d;
+    color: #cfc;
+}
+
+.level-grid .card .badge.warn {
+    background: #5a4a1d;
+    color: #fe9;
+}

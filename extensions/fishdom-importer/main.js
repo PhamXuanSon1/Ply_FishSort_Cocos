@@ -15,6 +15,7 @@ const unity = require('./unity');
 
 const PKG = 'fishdom-importer';
 const MESH_DIR = 'db://assets/8.Models/Meshes/Fishes';
+const PREVIEW_VERSION = 2; // 2: góc 3/4 (cá) / chính diện (sinh vật khác), có đèn
 const TEX_DIR = 'db://assets/8.Models/Textures/Fishes';
 
 function log(message) {
@@ -147,7 +148,8 @@ function resolveTexture(folder, name, fbx) {
  */
 async function previewFish(opts) {
     const dir = path.join(Editor.Project.path, 'temp', PKG, 'preview');
-    const key = opts.name + '_' + require('crypto').createHash('md5').update(opts.fbx.toLowerCase()).digest('hex').slice(0, 8);
+    // PREVIEW_VERSION đổi khi preview.py đổi cách render (góc camera, đèn) để bỏ cache cũ
+    const key = opts.name + '_' + require('crypto').createHash('md5').update(PREVIEW_VERSION + '|' + opts.fbx.toLowerCase() + '|' + (opts.png || '')).digest('hex').slice(0, 8);
     const file = path.join(dir, key + '.png');
     const meta = path.join(dir, key + '.json');
     if (opts.force || !fs.existsSync(file) || !fs.existsSync(meta)) {
@@ -272,6 +274,31 @@ async function writeAnimConfig(nodeUuid, u, report) {
     }
 }
 
+/**
+ * Đặt prefab GLB vào slot giống cá mẫu: SK_FishN > RootNode > <Tên> (mesh) + <Tên>_Rig; bỏ lớp bọc prefab
+ * (<tên file> + SkeletalAnimation), skinningRoot của mesh trỏ về slot (đường dẫn joint "RootNode/<Tên>_Rig/..." tính từ đó).
+ * GLB gốc (PlayCanvas converter, RootNode scale 0.01) -> scale 50 như các slot gốc. Trả về uuid RootNode.
+ */
+async function placeModel(slot, prefabUuid, name, report) {
+    const wrapper = await Editor.Message.request('scene', 'create-node', { parent: slot.uuid, assetUuid: prefabUuid, name });
+    const u = await sceneScript('unwrapInfo', wrapper);
+    let child = wrapper;
+    if (u.inner) {
+        await Editor.Message.request('scene', 'set-parent', { parent: slot.uuid, uuids: [u.inner], keepWorldTransform: false });
+        await Editor.Message.request('scene', 'remove-node', { uuid: wrapper });
+        child = u.inner;
+        if (u.meshNode) {
+            await setProp(u.meshNode, '__comps__.' + u.meshCompIndex + '.skinningRoot', { type: 'cc.Node', value: { uuid: slot.uuid } });
+        }
+        if (u.innerScale < 0.1) {
+            await setProp(child, 'scale', { type: 'cc.Vec3', value: { x: 50, y: 50, z: 50 } });
+            report('RootNode scale 0.01 -> 50 (như các slot gốc)');
+        }
+    }
+    await setupChild(slot, child, report);
+    return child;
+}
+
 async function placeInSlot(opts, prefabUuid, textureUuid, report) {
     const slots = await sceneScript('listSlots');
     const slot = slots.slots.find((s) => s.uuid === opts.slotUuid);
@@ -285,22 +312,7 @@ async function placeInSlot(opts, prefabUuid, textureUuid, report) {
         report('Đã xoá ' + ((info && info.children.length) || 0) + ' node con cũ của ' + slot.name);
     }
 
-    // giống cá mẫu: SK_FishN > RootNode > <Tên> (mesh) + <Tên>_Rig; bỏ lớp bọc prefab (<tên file> + SkeletalAnimation),
-    // skinningRoot của mesh trỏ về slot (đường dẫn joint "RootNode/<Tên>_Rig/..." tính từ đó)
-    const wrapper = await Editor.Message.request('scene', 'create-node', {
-        parent: slot.uuid, assetUuid: prefabUuid, name: opts.outName,
-    });
-    const u = await sceneScript('unwrapInfo', wrapper);
-    let child = wrapper;
-    if (u.inner) {
-        await Editor.Message.request('scene', 'set-parent', { parent: slot.uuid, uuids: [u.inner], keepWorldTransform: false });
-        await Editor.Message.request('scene', 'remove-node', { uuid: wrapper });
-        child = u.inner;
-        if (u.meshNode) {
-            await setProp(u.meshNode, '__comps__.' + u.meshCompIndex + '.skinningRoot', { type: 'cc.Node', value: { uuid: slot.uuid } });
-        }
-    }
-    await setupChild(slot, child, report);
+    const child = await placeModel(slot, prefabUuid, opts.outName, report);
     if (opts.unity) await writeAnimConfig(child, opts.unity, report);
 
     // Mats.textures[index] = texture của cá
@@ -324,11 +336,227 @@ async function placeInSlot(opts, prefabUuid, textureUuid, report) {
     return { slot: slot.name, index: slot.index, node: child };
 }
 
+// ---------------------------------------------------------------- Fish Level Setup
+
+const ROOM_TS = 'db://assets/7.Scripts/Gameplay/Room.ts';
+const BUBBLE_RE = /(export const BubbleData:\s*\r?\n\s*\[number, number, number\[\]\]\[\]\s*=\s*\r?\n)([^\r\n]*)/;
+const ITEMS_RE = /export const Items = \[[\s\S]*?\r?\n\][ \t]*\r?\n/;
+
+/** Tên node mesh (có skin) trong GLB - tên model (Fish20, Fish24, african_jewelfish...). */
+function glbModelName(file) {
+    try {
+        const d = fs.readFileSync(file);
+        const len = d.readUInt32LE(12);
+        const j = JSON.parse(d.toString('utf8', 20, 20 + len));
+        const n = (j.nodes || []).find((x) => x.mesh !== undefined && x.skin !== undefined) || (j.nodes || []).find((x) => x.mesh !== undefined);
+        return n && n.name ? n.name : '';
+    } catch (e) {
+        return '';
+    }
+}
+
+/** Số lần mỗi loại cá xuất hiện trong BubbleData của Room.ts. */
+function bubbleUsage(src) {
+    const m = BUBBLE_RE.exec(src);
+    const usage = {};
+    if (!m) return usage;
+    try {
+        for (const [, , types] of JSON.parse(m[2])) for (const t of types) usage[t] = (usage[t] || 0) + 1;
+    } catch (e) { /* data lỗi: bỏ qua */ }
+    return usage;
+}
+
+/** Items: mỗi loại cá n con -> n/3 nhóm [t, t, t], xáo trộn (thứ tự hộp ra slot). */
+function buildItems(data) {
+    const count = {};
+    for (const [, , types] of data) for (const t of types) count[t] = (count[t] || 0) + 1;
+    const items = [];
+    for (const t of Object.keys(count)) for (let i = 0; i < Math.floor(count[t] / 3); i++) items.push([+t, +t, +t]);
+    for (let i = items.length - 1; i > 0; i--) {
+        const k = Math.floor(Math.random() * (i + 1));
+        [items[i], items[k]] = [items[k], items[i]];
+    }
+    return items;
+}
+
+function formatItems(items) {
+    const cell = (a) => ('[ ' + a.join(', ') + ' ],').padEnd(16);
+    const lines = [];
+    for (let i = 0; i < items.length; i += 2) lines.push('  ' + items.slice(i, i + 2).map(cell).join(' ').trimEnd());
+    if (lines.length) lines[lines.length - 1] = lines[lines.length - 1].replace(/,$/, '');
+    return 'export const Items = [ \n' + lines.join('\n') + ' \n] \n';
+}
+
+/** Ghi BubbleData + Items vào Room.ts (giữ nguyên phần còn lại của file). */
+async function writeRoomData(data, items) {
+    const file = await dbToFs(ROOM_TS);
+    let src = fs.readFileSync(file, 'utf8');
+    if (!BUBBLE_RE.test(src)) throw new Error('Không tìm thấy khai báo BubbleData trong Room.ts');
+    if (!ITEMS_RE.test(src)) throw new Error('Không tìm thấy khai báo Items trong Room.ts');
+    src = src.replace(BUBBLE_RE, (_, head) => head + JSON.stringify(data));
+    src = src.replace(ITEMS_RE, formatItems(items));
+    fs.writeFileSync(file, src);
+    await Editor.Message.request('asset-db', 'refresh-asset', ROOM_TS);
+}
+
+/** Cá trong project: mỗi SK_FishN.glb = loại N-1 (slot SK_Fish<N-1>), kèm trạng thái trong scene / level. */
+async function listProjectFish() {
+    const meshDir = await dbToFs(MESH_DIR);
+    const texDir = await dbToFs(TEX_DIR);
+    const level = await sceneScript('levelInfo');
+    let usage = {};
+    try { usage = bubbleUsage(fs.readFileSync(await dbToFs(ROOM_TS), 'utf8')); } catch (e) { /* không đọc được Room.ts */ }
+    const texFiles = fs.existsSync(texDir) ? fs.readdirSync(texDir) : [];
+    const findTex = (n) => { const f = texFiles.find((x) => x.toLowerCase() === n.toLowerCase()); return f ? path.join(texDir, f) : ''; };
+    const fishTypes = level.room ? level.room.fishTypes : [];
+    const list = [];
+    for (const f of fs.readdirSync(meshDir)) {
+        const m = /^SK_Fish(\d+)\.glb$/i.exec(f);
+        if (!m) continue;
+        const index = parseInt(m[1], 10) - 1;
+        const file = path.join(meshDir, f);
+        const model = glbModelName(file);
+        const png = findTex('T_' + model + '_D.png') || findTex(model + '.png') || findTex('T_Fish' + m[1] + '_D.png');
+        const slot = level.slots[index];
+        list.push({
+            name: f.replace(/\.glb$/i, ''), file, url: MESH_DIR + '/' + f, index, model, png,
+            mtime: fs.statSync(file).mtimeMs,
+            slotModel: slot ? slot.model : null,
+            inScene: !!slot && slot.model === model,
+            playing: fishTypes.includes(index),
+            usage: usage[index] || 0,
+        });
+    }
+    list.sort((a, b) => a.index - b.index);
+    return { fish: list, fishTypes, bubbles: level.bubbles, bubbleFish: level.bubbleFish, slots: level.slots.length, ok: !!(level.fishRoot && level.room) };
+}
+
+/**
+ * Áp dụng danh sách cá được chơi: slot (node Fish), Mats.textures, Room.fishTypes, BubbleData + Items trong Room.ts, scene.
+ * opts: { selected: [index], clearUnused, regen, save }
+ */
+async function applyLevel(opts) {
+    const lines = [];
+    const report = (s) => { lines.push(s); log(s); };
+    try {
+        const selected = Array.from(new Set(opts.selected || [])).sort((a, b) => a - b);
+        if (!selected.length) throw new Error('Chưa chọn con cá nào');
+        const all = (await listProjectFish()).fish;
+        const pick = selected.map((i) => all.find((f) => f.index === i)).filter(Boolean);
+        let level = await sceneScript('levelInfo');
+        if (!level.fishRoot || !level.room) throw new Error('Không thấy node Fish / component Room - mở PlayScene trước');
+
+        // 1. đủ slot SK_Fish0..max (slot mới: cùng hướng + layer với slot đầu)
+        const maxIdx = Math.max(...selected);
+        const tpl = level.slots[0];
+        for (let i = level.slots.length; i <= maxIdx; i++) {
+            const uuid = await Editor.Message.request('scene', 'create-node', { parent: level.fishRoot.uuid, name: 'SK_Fish' + i });
+            if (tpl) await setProp(uuid, 'rotation', { type: 'cc.Vec3', value: { x: tpl.rot[0], y: tpl.rot[1], z: tpl.rot[2] } });
+            await setProp(uuid, 'layer', { type: 'cc.Layers', value: level.fishRoot.layer });
+            report('Tạo slot SK_Fish' + i);
+        }
+        level = await sceneScript('levelInfo');
+
+        // 2. model vào slot (slot đang đúng model thì giữ nguyên)
+        const slotsInfo = await sceneScript('listSlots');
+        const tex = slotsInfo.mats ? slotsInfo.mats.textures.slice() : [];
+        for (const f of pick) {
+            const slot = level.slots[f.index];
+            if (slot.model !== f.model) {
+                for (const c of slot.children) await Editor.Message.request('scene', 'remove-node', { uuid: c });
+                const prefab = await waitSubAsset(f.url, (s) => /\.prefab$/.test(s.name));
+                await placeModel(slot, prefab, f.name, () => {});
+                report('Slot ' + f.index + ' (' + slot.name + '): đặt ' + f.name + ' (' + f.model + ')');
+            }
+            if (f.png) {
+                const texUrl = await Editor.Message.request('asset-db', 'query-url', f.png);
+                const texUuid = await waitSubAsset(texUrl, (s) => s.type === 'cc.Texture2D');
+                while (tex.length <= f.index) tex.push(null);
+                if (tex[f.index] !== texUuid) report('Mats.textures[' + f.index + '] = ' + path.basename(f.png));
+                tex[f.index] = texUuid;
+            } else {
+                report('⚠ ' + f.name + ': không tìm thấy texture (T_' + f.model + '_D.png)');
+            }
+        }
+
+        // 3. slot không chọn: dọn model (như cấu hình gốc - chỉ loại được chơi có model)
+        if (opts.clearUnused) {
+            for (const slot of level.slots) {
+                if (selected.includes(slot.index) || !slot.children.length) continue;
+                for (const c of slot.children) await Editor.Message.request('scene', 'remove-node', { uuid: c });
+                report('Dọn slot ' + slot.index + ' (' + slot.name + ', ' + (slot.model || 'trống') + ')');
+            }
+        }
+
+        // 4. Mats.textures + Room.fishTypes
+        if (slotsInfo.mats) {
+            await setProp(slotsInfo.mats.uuid, '__comps__.' + slotsInfo.mats.compIndex + '.textures', {
+                type: 'cc.Texture2D', isArray: true, value: tex.map((u) => ({ type: 'cc.Texture2D', value: { uuid: u || '' } })),
+            });
+        }
+        await setProp(level.room.uuid, '__comps__.' + level.room.compIndex + '.fishTypes', {
+            type: 'Number', isArray: true, value: selected.map((v) => ({ type: 'Number', value: v })),
+        });
+        report('Room.fishTypes = [' + selected.join(', ') + ']');
+
+        // 5. BubbleData + Items: giữ vị trí / cỡ bubble đang có, chia lại loại cá (Gen Buble From Avai)
+        let data = null;
+        if (opts.regen) {
+            data = await sceneScript('genBubbles', selected);
+            if (!data.length) throw new Error('Scene không có bubble nào để gen (initBubbles chưa chạy?)');
+            const items = buildItems(data);
+            const count = {};
+            data.forEach(([, , t]) => t.forEach((x) => { count[x] = (count[x] || 0) + 1; }));
+            report('Gen ' + data.length + ' bubble, ' + items.length + ' hộp: ' + Object.keys(count).map((k) => 'loại ' + k + ' × ' + count[k]).join(', '));
+            if (opts.save) {
+                await Editor.Message.request('scene', 'save-scene');
+                report('Đã lưu scene');
+            }
+            await writeRoomData(data, items);
+            report('Đã ghi BubbleData + Items vào Room.ts');
+            // Room.ts compile lại -> nạp lại scene để initBubbles dùng data mới
+            await sleep(6000);
+            await Editor.Message.request('scene', 'soft-reload').catch(() => {});
+            report('Đã nạp lại scene với BubbleData mới');
+        } else if (opts.save) {
+            await Editor.Message.request('scene', 'save-scene');
+            report('Đã lưu scene');
+        }
+        return { ok: true, log: lines };
+    } catch (e) {
+        report('LỖI: ' + (e && e.message ? e.message : e));
+        return { ok: false, log: lines };
+    }
+}
+
 // ---------------------------------------------------------------- messages
 
 exports.methods = {
     openPanel() {
         Editor.Panel.open(PKG);
+    },
+
+    openLevelPanel() {
+        Editor.Panel.open(PKG + '.level');
+    },
+
+    listProjectFish() {
+        return listProjectFish();
+    },
+
+    /** Ảnh xem trước của GLB trong project (cache theo tên + thời điểm sửa file). */
+    async previewProjectFish(opts) {
+        try {
+            return Object.assign({ ok: true }, await previewFish({
+                blender: opts.blender, name: opts.name + '_' + Math.round(opts.mtime || 0), fbx: opts.file, png: opts.png, force: opts.force,
+            }));
+        } catch (e) {
+            return { ok: false, error: e && e.message ? e.message : String(e) };
+        }
+    },
+
+    applyLevel(opts) {
+        return applyLevel(opts);
     },
 
     detectBlender() {

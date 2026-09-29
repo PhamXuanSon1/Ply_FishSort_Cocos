@@ -42,6 +42,22 @@ Scene:   Room > Fish > SK_FishN (slot)
 
 Trong editor cá sẽ hiện màu hồng tím và thiếu vây/đuôi vì chưa có material - vào game mới có material `Fish`.
 
+## Fish Level Setup (Tool → Fish Level Setup)
+
+Chọn cá được chơi trong level, không phải sửa tay scene / Room.ts:
+
+- Lưới ảnh mọi `SK_FishN.glb` trong `Meshes/Fishes` (render bằng Blender, cache theo thời điểm sửa file). `SK_FishN.glb` = **loại N-1** = slot `SK_Fish<N-1>`
+  (quy ước sẵn có: slot 19 = SK_Fish20.glb...). Texture: `T_<tên model>_D.png`, không có thì `T_FishN_D.png`.
+- Thẻ hiện: loại, model, đã có trong slot chưa, đang chơi + số con trong BubbleData. Bấm để chọn / bỏ; **Chọn cá đang chơi** lấy theo `Room.fishTypes`.
+- **Áp dụng**:
+  1. tạo thêm slot `SK_FishN` nếu thiếu (cùng hướng + layer slot đầu);
+  2. slot của con được chọn chưa đúng model -> đặt model như cá mẫu (`RootNode > <Tên> + <Tên>_Rig`, skinningRoot = slot, layer, canh tâm,
+     material trống; GLB gốc PlayCanvas: RootNode scale 50); slot đã đúng thì giữ nguyên;
+  3. (tuỳ chọn) dọn model ở slot không chọn;
+  4. `MatCustom` (`Mats.textures[loại]`) + `Room.fishTypes`;
+  5. (tuỳ chọn) **Gen bubble**: gọi `Room.randomFromAvailableBubbles(fishTypes)` - giữ vị trí + cỡ bubble đang có, chia lại loại cá theo nhóm 3;
+     ghi `BubbleData` + `Items` (nhóm [t,t,t], xáo trộn) thẳng vào `Room.ts`, lưu scene rồi nạp lại để bubble hiện theo data mới.
+
 ## Bake từ project Unity (khuyên dùng)
 
 Đổi thư mục thành gốc project Unity (vd `F:\AssetFish\FishSort-new-item`, có `Assets/` + `ProjectSettings/`). Tool tự quét mọi prefab

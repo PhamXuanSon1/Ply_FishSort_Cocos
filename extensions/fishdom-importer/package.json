@@ -17,6 +17,17 @@
         "width": 620,
         "height": 760
       }
+    },
+    "level": {
+      "title": "Fish Level Setup",
+      "type": "dockable",
+      "main": "./src/panels/level.js",
+      "size": {
+        "min-width": 480,
+        "min-height": 420,
+        "width": 680,
+        "height": 800
+      }
     }
   },
   "contributions": {
@@ -24,7 +35,8 @@
       "script": "./scene.js"
     },
     "menu": [
-      { "path": "Tool", "label": "Fishdom Fish Importer", "message": "open-panel" }
+      { "path": "Tool", "label": "Fishdom Fish Importer", "message": "open-panel" },
+      { "path": "Tool", "label": "Fish Level Setup", "message": "open-level-panel" }
     ],
     "messages": {
       "open-panel": { "methods": ["openPanel"] },
@@ -33,7 +45,11 @@
       "list-slots": { "methods": ["listSlots"] },
       "preview-fish": { "methods": ["previewFish"] },
       "import-fish": { "methods": ["importFish"] },
-      "fix-slot": { "methods": ["fixSlot"] }
+      "fix-slot": { "methods": ["fixSlot"] },
+      "open-level-panel": { "methods": ["openLevelPanel"] },
+      "list-project-fish": { "methods": ["listProjectFish"] },
+      "preview-project-fish": { "methods": ["previewProjectFish"] },
+      "apply-level": { "methods": ["applyLevel"] }
     }
   }
 }
