@@ -1,10 +1,12 @@
-import { _decorator, Component, Node, Quat, Vec3, SkeletalAnimation, clamp, clamp01, lerp, inverseLerp, tween, Tween, v3 } from 'cc';
+import { _decorator, Component, Node, Quat, Vec3, SkeletalAnimation, AnimationState, AnimationClip, clamp, clamp01, lerp, inverseLerp, tween, Tween, v3 } from 'cc';
 import { Thing } from '../Thing';
+import { CreatureAnimator } from './CreatureAnimator';
 const { ccclass, property } = _decorator;
 
 const DEG2RAD = Math.PI / 180;
 const RAD2DEG = 180 / Math.PI;
 const HIST = 128; // lịch sử tốc độ góc để lấy mẫu trễ theo vị trí trên thân
+const MIN_BODY_BONES = 2; // ít hơn số xương thân này (vd bạch tuộc: Spine_1 + Arm_*) thì phát animation clip của model
 
 /** Vây ngực, vây bụng, vây lưng, vây đuôi. */
 export enum FinRole { Pectoral, Pelvic, Dorsal, Anal }
@@ -34,7 +36,9 @@ interface FinChainData {
 //   Fin_<vị trí>_<bên>_<đốt>: T_F / T_B = vây lưng trước / sau, B_M = vây đuôi, B_L / B_R = vây bụng, M_L / M_R = vây ngực;
 //   bone *_end là chóp, không có skin, bỏ qua.
 //   Biến thể Fish_1: Spine_01..N (không có Tail), Fin_<vị trí>_<đốt>_<bên>, Fin_<đốt>_B = vây đuôi.
-const BODY_BONE_RE = /^(Spine|Tail)_?(\d+)$/i;
+//   Biến thể Fishdom (FishdomFish/*.fbx): joints > body1..N > tail1..N, đuôi tách nhánh tail_up / tail_mid / tail_dwn;
+//   neck > head (vây bên là con của head); tên vây kiểu <left|right>_front_fin#, <left|right>_side_plv_#, up_fin_front#, dwn_fin#...
+const BODY_BONE_RE = /^(Spine|Tail|body)_?(\d+)$/i;
 const FIN_BONE_RE = /^Fin_([TBM])_([FBLRM])_(\d+)$/i;              // Fin_M_L_1 (Fish_Rig)
 const FIN_BONE_INDEX_FIRST_RE = /^Fin_([TBM])_(\d+)_([FBLRM])$/i;  // Fin_M_01_L (Fish_1)
 const FIN_BONE_INDEX_PREFIX_RE = /^Fin_(\d+)_([TBM])_([FBLRM])$/i; // Fin_1_M_L (Spine_1)
@@ -65,6 +69,36 @@ function tryGetFinRole(key: string): { role: FinRole; side: number } | null {
         default: return null;
     }
 }
+
+// ---------- Quy ước tên Fishdom ----------
+// Nhánh vây đuôi: tail_up1, tail_mid, tail_dwn_1, tailUp, tailTop... -> sóng thân như đốt đuôi cuối.
+const FD_TAIL_BRANCH_RE = /^tail_?(up|upp|upr|top|mid|middle|centr|dwn|down|btm)_?(\d*)$/i;
+// Vây bên: <left|right>_<loại><đốt>, đốt cuối có thể tách nhánh _b / _f (left_front_fin3_b).
+const FD_SIDE_FIN_RE = /^(left|right)_?(front_fin|wing|front_leg|side_?plv|dwn_?plv|down_plv|bttm_plv|btm_fin|dwn_fin|back_leg)_?(\d+)(?:_[bf])?$/i;
+// Vây giữa: vây lưng (up_*/top_*) và vây hậu môn (dwn_*/down_*).
+const FD_CENTER_FIN_RE = /^(up_fin(?:_front|_back)?|c?_?top_plv|up_plv|upper_plv|uppr_plv|upp_plv|dwn_fin(?:_back)?|c?_?dwn_plv|dvn_plv|down_plv)_?(\d*)$/i;
+
+type FishdomBone =
+    | { kind: 'tailBranch'; key: string; index: number }
+    | { kind: 'sideFin'; type: string; side: number; index: number }
+    | { kind: 'centerFin'; key: string; role: FinRole; index: number };
+
+function tryParseFishdomName(name: string): FishdomBone | null {
+    let m = FD_TAIL_BRANCH_RE.exec(name);
+    if (m) return { kind: 'tailBranch', key: m[1].toLowerCase(), index: m[2] ? parseInt(m[2], 10) : 0 };
+    m = FD_SIDE_FIN_RE.exec(name);
+    if (m) return { kind: 'sideFin', type: m[2].toLowerCase().replace('_', ''), side: m[1].toLowerCase() === 'left' ? -1 : 1, index: parseInt(m[3], 10) };
+    m = FD_CENTER_FIN_RE.exec(name);
+    if (m) {
+        const key = m[1].toLowerCase();
+        const role = /^(up|c?_?top|upp)/.test(key) ? FinRole.Dorsal : FinRole.Anal;
+        return { kind: 'centerFin', key, role, index: m[2] ? parseInt(m[2], 10) : 0 };
+    }
+    return null;
+}
+
+/** Vây ngực của 1 bên: ưu tiên front_fin / wing / front_leg; không có thì side_plv làm vây ngực. Còn lại = vây bụng. */
+const FD_PECTORAL_TYPES = ['frontfin', 'wing', 'frontleg', 'sideplv'];
 
 function nodeDepth(n: Node): number {
     let d = 0;
@@ -174,7 +208,19 @@ export class Fish extends Component {
     centerFinChainLag = 0.6;
 
     get speed(): number { return this._speed; }
-    set speed(v: number) { this._speed = Math.max(0, v); }
+    set speed(v: number) {
+        this._speed = Math.max(0, v);
+        if (this.clipState) this.clipState.speed = Math.max(0.2, this._speed);
+    }
+
+    /** Sinh vật không phải cá có animator riêng (bạch tuộc, cua - port từ Unity, xem CreatureAnimator.ts). */
+    private creature: CreatureAnimator | null = null;
+    get creatureKind(): string | null { return this.creature ? this.creature.kind : null; }
+
+    /** Chế độ clip (dự phòng): không phải cá, không có animator riêng nhưng model có animation clip -> phát clip. */
+    private clipAnim: SkeletalAnimation | null = null;
+    private clipState: AnimationState | null = null;
+    get usingClip(): boolean { return this.clipAnim !== null; }
 
     private moveTween: Tween<Node> | null = null;
 
@@ -228,6 +274,7 @@ export class Fish extends Component {
      * step() khi paused nên clock/phase không trôi trong lúc dừng, tiếp tục đúng chỗ đã dừng. */
     setAnim(on: boolean) {
         this.paused = !on;
+        if (this.clipAnim) on ? this.clipAnim.resume() : this.clipAnim.pause();
     }
 
     start() {
@@ -270,22 +317,62 @@ export class Fish extends Component {
         if (this.randomizeTimeOffset) this.timeOffset = Math.random() * 100;
 
         this.cachedRig = null;
-        this.disableBakedSkinning();
+        this.clipAnim = null;
+        this.clipState = null;
+        this.creature = null;
+        const skel = this.disableBakedSkinning();
+
+        // bạch tuộc / cua: animator riêng thay cho sóng thân cá
+        this.creature = CreatureAnimator.tryCreate(this.node);
+        if (this.creature) {
+            this.creature.finish(this.timeOffset, this._speed);
+            this.built = true;
+            return;
+        }
+
         this.resolveBones();
         this.bones.sort((a, b) => nodeDepth(a.node) - nodeDepth(b.node)); // cha trước con để RotateAbout đọc được parent đã xoay trong frame
+
+        const bodyBones = this.bones.filter(b => b.kind === BoneKind.Body).length;
+        if (bodyBones < MIN_BODY_BONES && skel && (skel.defaultClip || skel.clips.length > 0)) {
+            this.resetPose();
+            this.bones.length = 0;
+            this.startClip(skel);
+        }
 
         this.built = true;
         this.evaluatePhase(this.timeOffset);
     }
 
+    /**
+     * Phát clip mặc định của model (real-time skinning), lệch thời điểm ngẫu nhiên như timeOffset của procedural.
+     * PingPong thay vì Loop: clip trong rig gốc (vd bạch tuộc SK_Fish21, Take 001) chỉ là nửa nhịp vẫy
+     * (+37° -> -32°), đầu và cuối lệch nhau ~70° nên Loop bị giật mỗi lần quay về đầu; chạy xuôi rồi ngược thì liền.
+     */
+    private startClip(skel: SkeletalAnimation): void {
+        const clip = skel.defaultClip || skel.clips[0];
+        if (!clip) return;
+        skel.play(clip.name);
+        const state = skel.getState(clip.name);
+        if (!state) return;
+        state.wrapMode = AnimationClip.WrapMode.PingPong;
+        state.speed = Math.max(0.2, this._speed);
+        if (this.randomizeTimeOffset && state.duration > 0) state.time = Math.random() * state.duration;
+        this.clipAnim = skel;
+        this.clipState = state;
+        if (this.paused) skel.pause();
+    }
+
     resetPose(): void {
         for (const b of this.bones) if (b.node && b.node.isValid) b.node.rotation = b.bindLocal;
+        this.creature?.resetPose();
     }
 
     /** Tiến một bước dt giây: đo tốc độ góc của node, tích luỹ pha theo Speed rồi đặt pose. */
     step(dt: number): void {
         if (!this.built) this.build();
-        if (dt <= 0) return;
+        if (this.creature) { this.creature.step(dt, this._speed); return; }
+        if (this.clipAnim || dt <= 0) return; // chế độ clip: SkeletalAnimation tự chạy
         this.clock += dt;
         this.measureTurn(dt);
         this.bodyPhase += dt * this.swayFrequency * this._speed * Math.PI * 2;
@@ -296,6 +383,7 @@ export class Fish extends Component {
     /** Pose tĩnh tại thời điểm time (giây), Speed = 1, không uốn theo đường bơi. Dùng để preview. */
     evaluate(time: number): void {
         if (!this.built) this.build();
+        if (this.clipAnim || this.creature) return;
         this.yawRate = 0;
         this.pitchRate = 0;
         this.hYaw.fill(0);
@@ -329,13 +417,15 @@ export class Fish extends Component {
         return this.cachedRig;
     }
 
-    /** SkinnedMeshRenderer chỉ lên hình đúng khi bone xoay bằng tay nếu chạy real-time skinning (không bake). */
-    private disableBakedSkinning(): void {
+    /** SkinnedMeshRenderer chỉ lên hình đúng khi bone xoay bằng tay nếu chạy real-time skinning (không bake).
+     * Trả về SkeletalAnimation (nếu có) để build() quyết định có phát clip hay không. */
+    private disableBakedSkinning(): SkeletalAnimation | null {
         const skel = this.node.getComponentInChildren(SkeletalAnimation);
         if (skel) {
             skel.stop();
             skel.useBakedAnimation = false;
         }
+        return skel;
     }
 
     private resolveBones(): void {
@@ -350,27 +440,54 @@ export class Fish extends Component {
         const tails: { index: number; node: Node }[] = [];
         const finGroups = new Map<string, { index: number; node: Node }[]>();
         let head: Node | null = null;
+        // Fishdom: nhánh vây đuôi, vây bên (gom theo "<loại>|<bên>"), vây giữa (gom theo tên)
+        const fdTailBranches = new Map<string, { index: number; node: Node }[]>();
+        const fdSideFins = new Map<string, { type: string; side: number; list: { index: number; node: Node }[] }>();
+        const fdCenterFins = new Map<string, { role: FinRole; list: { index: number; node: Node }[] }>();
 
         for (const n of all) {
             const name = n.name;
             if (/_end$/i.test(name)) continue; // chóp, không có skin
             const m = BODY_BONE_RE.exec(name);
             if (m) {
-                const list = m[1].toLowerCase() === 'spine' ? spines : tails;
+                const list = m[1].toLowerCase() === 'tail' ? tails : spines; // Spine / body = thân
                 list.push({ index: parseInt(m[2], 10), node: n });
                 continue;
             }
             if (name.toLowerCase() === 'head') { head = n; continue; }
             const parsed = tryParseFinName(name);
-            if (!parsed) continue;
-            let group = finGroups.get(parsed.key);
-            if (!group) finGroups.set(parsed.key, group = []);
-            group.push({ index: parsed.index, node: n });
+            if (parsed) {
+                let group = finGroups.get(parsed.key);
+                if (!group) finGroups.set(parsed.key, group = []);
+                group.push({ index: parsed.index, node: n });
+                continue;
+            }
+            const fd = tryParseFishdomName(name);
+            if (!fd) continue;
+            if (fd.kind === 'tailBranch') {
+                let list = fdTailBranches.get(fd.key);
+                if (!list) fdTailBranches.set(fd.key, list = []);
+                list.push({ index: fd.index, node: n });
+            } else if (fd.kind === 'sideFin') {
+                const key = `${fd.type}|${fd.side}`;
+                let g = fdSideFins.get(key);
+                if (!g) fdSideFins.set(key, g = { type: fd.type, side: fd.side, list: [] });
+                g.list.push({ index: fd.index, node: n });
+            } else {
+                let g = fdCenterFins.get(fd.key);
+                if (!g) fdCenterFins.set(fd.key, g = { role: fd.role, list: [] });
+                g.list.push({ index: fd.index, node: n });
+            }
         }
 
         spines.sort((a, b) => a.index - b.index);
         tails.sort((a, b) => a.index - b.index);
         const bodyChain = [...spines, ...tails].map(s => s.node);
+        const tailBranchChains: Node[][] = [];
+        for (const list of fdTailBranches.values()) {
+            list.sort((a, b) => a.index - b.index);
+            tailBranchChains.push(list.map(s => s.node));
+        }
 
         if (bodyChain.length === 0) {
             console.warn(`Fish '${this.node.parent.parent.getComponent(Thing).thingType}': không tìm thấy bone thân (Spine/Tail) dưới '${root.name}', không animate.`);
@@ -389,16 +506,38 @@ export class Fish extends Component {
             group.sort((a, b) => a.index - b.index);
             finList.push({ role: roleInfo.role, side: roleInfo.side, segments: group.map(g => g.node) });
         }
+        for (const side of [-1, 1]) {
+            const groups = Array.from(fdSideFins.values()).filter(g => g.side === side);
+            const pecType = FD_PECTORAL_TYPES.find(t => groups.some(g => g.type === t));
+            for (const g of groups) {
+                g.list.sort((a, b) => a.index - b.index);
+                const role = g.type === pecType ? FinRole.Pectoral : FinRole.Pelvic;
+                finList.push({ role, side, segments: g.list.map(s => s.node) });
+            }
+        }
+        for (const g of fdCenterFins.values()) {
+            g.list.sort((a, b) => a.index - b.index);
+            finList.push({ role: g.role, side: 0, segments: g.list.map(s => s.node) });
+        }
         finList.sort((a, b) => (a.role !== b.role ? a.role - b.role : a.side - b.side));
 
         // vị trí trên thân theo z root space (this.node): gốc chuỗi thân = 0, chóp đuôi (bone *_end nếu có) = 1
         const last = bodyChain[bodyChain.length - 1];
         this.zStart = this.localPos(bodyChain[0]).z;
         this.zTip = (last.children.length > 0 ? this.localPos(last.children[0]) : this.localPos(last)).z;
+        // Fishdom: đuôi tách nhánh -> chóp đuôi = chóp nhánh xa gốc thân nhất
+        for (const chain of tailBranchChains) {
+            const tipNode = chain[chain.length - 1];
+            const z = (tipNode.children.length > 0 ? this.localPos(tipNode.children[0]) : this.localPos(tipNode)).z;
+            if (Math.abs(z - this.zStart) > Math.abs(this.zTip - this.zStart)) this.zTip = z;
+        }
         this.tailSign = this.zTip >= this.zStart ? 1 : -1;
         if (Math.abs(this.zTip - this.zStart) < 1e-5) this.zTip = this.zStart - 1e-5;
 
         for (const t of bodyChain) this.registerBone(t, BoneKind.Body, { along: this.alongOf(t) });
+        for (const chain of tailBranchChains) {
+            for (const t of chain) this.registerBone(t, BoneKind.Body, { along: this.alongOf(t) });
+        }
         if (head) this.registerBone(head, BoneKind.Head, { along: this.alongOf(head) });
 
         for (const fin of finList) {
