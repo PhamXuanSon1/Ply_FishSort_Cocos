@@ -67,7 +67,8 @@ export class Clock extends Component {
 
     onChecking() {
         // room.onBind();
-        room.fishTypes = [1, 2, 6, 8, 10, 16, 17]
+        // Không đổi room.fishTypes ở đây: các loại cũ [1, 2, 6, 8, 10, 16, 17] không có model trong
+        // Room > Fish nên spawnUnlimited sinh ra bong bóng chứa cá vô hình (trông như bong bóng trống).
     }
 
 

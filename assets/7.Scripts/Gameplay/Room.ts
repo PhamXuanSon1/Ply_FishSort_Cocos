@@ -195,9 +195,12 @@ export class Room extends Component {
 
             let totalBox = 0;
 
-            let maxType = this.fishTypes.length < 4 ? this.fishTypes.length : 4;
+            // chỉ loại có model trong Room > Fish, loại thiếu model sẽ thành cá vô hình (bong bóng trống)
+            let available = this.fishTypes.filter(t => this.fish.children[t]?.children.length > 0);
+            if(available.length == 0) return;
+            let maxType = available.length < 4 ? available.length : 4;
 
-            let types = Ulis.shuffleArray(this.fishTypes).slice(0, maxType);
+            let types = Ulis.shuffleArray(available).slice(0, maxType);
 
             let typeAmount = [];
 
