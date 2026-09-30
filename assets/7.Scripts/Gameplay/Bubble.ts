@@ -95,7 +95,7 @@ export class Bubble extends PoolMember {
             this.collider.apply();  
         }
 
-        // this.body.linearVelocity = v2(0, length * 10);
+        this.body.linearVelocity = v2(0, length * 10);
     }
 
     onDragStart(event: EventTouch) {

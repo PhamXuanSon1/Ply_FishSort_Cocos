@@ -1,0 +1,110 @@
+{
+  "ver": "2.3.14",
+  "importer": "gltf",
+  "imported": true,
+  "uuid": "faf80550-da29-4e51-b3c8-18bff8a5e5b1",
+  "files": [],
+  "subMetas": {
+    "b2fc3": {
+      "importer": "gltf-mesh",
+      "uuid": "faf80550-da29-4e51-b3c8-18bff8a5e5b1@b2fc3",
+      "displayName": "",
+      "id": "b2fc3",
+      "name": "Fish45.mesh",
+      "userData": {
+        "gltfIndex": 0,
+        "triangleCount": 4850
+      },
+      "ver": "1.1.1",
+      "imported": true,
+      "files": [
+        ".bin",
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "9265a": {
+      "importer": "gltf-skeleton",
+      "uuid": "faf80550-da29-4e51-b3c8-18bff8a5e5b1@9265a",
+      "displayName": "",
+      "id": "9265a",
+      "name": "Fish45_Rig.skeleton",
+      "userData": {
+        "gltfIndex": 0,
+        "jointsLength": 29
+      },
+      "ver": "1.0.1",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "fbc13": {
+      "importer": "gltf-scene",
+      "uuid": "faf80550-da29-4e51-b3c8-18bff8a5e5b1@fbc13",
+      "displayName": "",
+      "id": "fbc13",
+      "name": "SK_Fish45.prefab",
+      "userData": {
+        "gltfIndex": 0
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    }
+  },
+  "userData": {
+    "imageMetas": [],
+    "lods": {
+      "enable": false,
+      "hasBuiltinLOD": false,
+      "options": [
+        {
+          "screenRatio": 0.25,
+          "faceCount": 1
+        },
+        {
+          "screenRatio": 0.125,
+          "faceCount": 0.25
+        },
+        {
+          "screenRatio": 0.01,
+          "faceCount": 0.1
+        }
+      ]
+    },
+    "assetFinder": {
+      "meshes": [
+        "faf80550-da29-4e51-b3c8-18bff8a5e5b1@b2fc3"
+      ],
+      "skeletons": [
+        "faf80550-da29-4e51-b3c8-18bff8a5e5b1@9265a"
+      ],
+      "textures": [],
+      "materials": [],
+      "scenes": [
+        "faf80550-da29-4e51-b3c8-18bff8a5e5b1@fbc13"
+      ]
+    },
+    "meshOptimize": {
+      "enable": true,
+      "vertexCache": true,
+      "vertexFetch": true,
+      "overdraw": true
+    },
+    "meshSimplify": {
+      "enable": true,
+      "targetRatio": 1
+    },
+    "meshCompress": {
+      "enable": true,
+      "encode": false,
+      "compress": true,
+      "quantize": true
+    }
+  }
+}

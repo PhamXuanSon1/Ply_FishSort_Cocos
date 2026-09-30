@@ -1,4 +1,5 @@
-import { _decorator, assetManager, Component, Font, Node } from "cc";
+import { _decorator, assetManager, AudioSource, Component, Font, Node, UIOpacity } from "cc";
+import { PREVIEW } from "cc/env";
 const { ccclass, property } = _decorator;
 
 // openFullscreen();
@@ -7,19 +8,68 @@ export var gc: GameController;
 
 @ccclass("GameController")
 export class GameController extends Component {
+  @property({ type: String })
+  storeDialogMessage: string = "Open Store";
+  @property({ type: Boolean })
+  showStoreDialogInWebPreview: boolean = true;
+  @property([AudioSource]) audioSources: AudioSource[] = [];
+  @property(UIOpacity) UIOpacity: UIOpacity = null;
+  @property([Node]) nodesToHide: Node[] = [];
+
+  // / Đang chạy kênh PureHTML - UI đọc cờ này để bỏ bàn tay hướng dẫn (UI.handTap không bật tay lên nữa). */
+  isPureHTML: boolean = false;
+
+  // / Phát ra khi game bị dừng (đã chuyển sang store) - Room nghe để khoá gameplay. */
+  static readonly EVENT_STOP = "game-stop";
+  // / true sau khi redirectToStore được gọi: không cho chơi tiếp nữa. */
+  stopped: boolean = false;
+
+  // / Dừng game hẳn (chỉ 1 lần): các hệ gameplay nghe EVENT_STOP để khoá thao tác, dừng đồng hồ / spawn. */
+  stopGame() {
+    if (this.stopped) return;
+    this.stopped = true;
+    this.node.emit(GameController.EVENT_STOP);
+  }
 
   onLoad() {
     gc = this;
+    try{
+            if(PlayableSDK.channel == "PureHTML") {
+              console.log("PureHTML channel, mute audio and hide UI");
+                this.isPureHTML = true;
+                this.muteAudioClips();
+                if (this.UIOpacity) this.UIOpacity.opacity = 0;
+                for (const node of this.nodesToHide) {
+                  if (node) node.active = false;
+                }
+            }
+        } catch(error){
+
+        }
   }
   
   start() {
   }
 
   update(deltaTime: number) {}
-
+  private muteAudioClips(): void {
+    for (const clip of this.audioSources) {
+      if (clip) {
+        clip.stop();
+        clip.volume = 0;
+        clip.clip = null;
+      }
+    }
+  }
  
 
   redirectToStore() {    
+    if (PREVIEW && this.showStoreDialogInWebPreview && typeof window !== 'undefined') {
+            const shouldOpenStore = window.confirm(this.storeDialogMessage);
+            if (!shouldOpenStore) return;
+        }
+    // Đã chuyển sang store -> dừng game, người chơi không chơi tiếp được nữa (gọi từ bất cứ đâu đều áp dụng).
+    this.stopGame();
     try {
       PlayableSDK.download();
       PlayableSDK.game_end();            
@@ -97,14 +147,13 @@ async function loadFont() {
       }
 
       gameLoad.font = fontName;
-
-      // Build single-file (playable-ads-builder) đã tự đăng ký font qua BingoEngine.fontLoader
+    // Build single-file (playable-ads-builder) đã tự đăng ký font qua BingoEngine.fontLoader
       // (hook vào cc.assetManager.downloader cho .ttf/.woff/...) NGAY khi assetManager.loadAny
       // tải xong - nhưng nó đặt tên font-family theo đường dẫn resource nội bộ đã sanitize, KHÔNG
-      // phải theo `fontName` ("DVN-Fredoka-Bold") mà code này dùng -> ctx.font yêu cầu đúng tên
+      // phải theo fontName ("DVN-Fredoka-Bold") mà code này dùng -> ctx.font yêu cầu đúng tên
       // "DVN-Fredoka-Bold" sẽ không khớp font đã đăng ký, fallback về font mặc định.
       //
-      // Trước đây tự tạo `new FontFace(fontName, \`url(${asset.nativeUrl})\`)` để dự phòng riêng
+      // Trước đây tự tạo new FontFace(fontName, \`url(${asset.nativeUrl})\)` để dự phòng riêng
       // cho localhost, NHƯNG FontFace với nguồn là chuỗi url() để chính trình duyệt tự fetch qua
       // tầng network RIÊNG - không đi qua fetch/XMLHttpRequest mà bản build single-file đã patch để
       // phục vụ asset nhúng base64 trong file (BingoEngine chỉ patch `fetch` cho .wasm/.bin, còn lại
@@ -162,6 +211,3 @@ function openFullscreen() {
 
   document.addEventListener('pointerdown', enterFullscreen, { once: true });
 }
-
-
-

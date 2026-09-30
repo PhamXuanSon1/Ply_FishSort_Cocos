@@ -6,9 +6,9 @@ const RAD2DEG = 180 / Math.PI;
 const HIST = 128; // lịch sử tốc độ góc để lấy mẫu trễ theo vị trí trên thân
 
 /**
- * Animator procedural cho sinh vật KHÔNG bơi như cá thường (bạch tuộc, cua, sao biển, cá ngựa, hải cẩu), port từ bản Unity:
+ * Animator procedural cho sinh vật KHÔNG bơi như cá thường (bạch tuộc, cua, sao biển, cá ngựa, hải cẩu, rùa), port từ bản Unity:
  *  - FishPoseJob (FishAnimationJobs.cs), nhánh Wave + SideFin: engine tính pose dùng chung;
- *  - Octopus / Crab / Starfish / Seahorse / SealProceduralAnimator.cs: tìm bone theo tên + cây, bake tham số mỗi bone;
+ *  - Octopus / Crab / Starfish / Seahorse / Seal / TurtleProceduralAnimator.cs: tìm bone theo tên + cây, bake tham số mỗi bone;
  *  - FishRigProceduralAnimator.cs: Find Bones + hình học vây cho cá ngựa / hải cẩu (rig cá chuẩn);
  *  - CreatureRigUtil.cs: tiện ích tìm bone.
  * Fish.ts gọi CreatureAnimator.tryCreate() lúc build; nhận ra rig thì toàn bộ animation đi qua đây thay vì sóng thân cá.
@@ -213,6 +213,7 @@ export class CreatureAnimator {
             case 'StarfishProceduralAnimator': return buildStarfish(root, body, params);
             case 'SeahorseProceduralAnimator': return buildSeahorse(root, params);
             case 'SealProceduralAnimator': return buildSeal(root, params);
+            case 'TurtleProceduralAnimator': return buildTurtle(root, body, params);
             default: return null; // FishRig / Fishdom / loài chưa port: Fish.ts (sóng thân cá)
         }
     }
@@ -600,6 +601,74 @@ function buildStarfish(root: Node, body: Node, params: Record<string, number>): 
                 along: 0.5, axis: 1, bendScale: 0, pitchBend: false,  // mặt luôn về camera nên không uốn theo rẽ hướng
                 amp: r ? s.swimArmAngle : s.swimArmTipAngle, lag,
                 idleVariant: true, idleAmp: r ? s.armAngle : s.armTipAngle, idleLag: lag,
+            });
+        });
+    }
+    return a;
+}
+
+// ---------- Rùa (TurtleProceduralAnimator) ----------
+
+/**
+ * Root > Spine_1 > Neck_2..4 > Head (cổ), Shell (mai), Spine_2 > Spine_3 > Tail (đuôi),
+ * Leg_1_<F|B>_<L|R> > Leg_2 > Leg_3 (chân chèo; chóp chân sau trùng tên Leg_2_B_* nên duyệt theo cây). Bên trái / phải theo dấu x.
+ * Idle: chân chèo trước vẫy lên xuống kiểu vây (quét quanh trục dọc thân + xoắn quanh trục gốc -> chóp lệch pha 90°), hai bên đồng pha,
+ * đốt sau trễ pha; chân sau nửa biên độ, lệch pha; cổ gật nhẹ; đuôi vẫy nhẹ; thân lắc rất nhẹ; mai gần như cứng.
+ * Bơi (nhịp ổn định swimFrequency): chân trước quạt rộng hơn, tâm quạt hạ xuống, quạt xuống nhanh / nâng lên chậm; chân sau đạp ngay sau
+ * cú quạt trước; cổ gật và ngẩng đầu.
+ */
+const TURTLE = {
+    bodyFrequency: 0.9, bodySway: 1.5, shellRoll: 0.5, neckNod: 3, neckLag: 0.5, neckBend: 0.8, tailSway: 4, tailLag: 0.5,
+    swimFrequency: 0.7, swimNeckNod: 2.5, swimNeckLift: 2,
+    strokeFrequency: 0.7, flipperAngle: 22, flipperTwist: 15, flipperLag: 0.6, flipperPhaseOffset: 0, backScale: 0.5, backPhaseOffset: 1.5,
+    swimFlipperAngle: 30, swimFlipperDrop: 8, swimStrokeSkew: 0.4, swimBackScale: 0.6, swimBackPhaseOffset: 0.8, swimBackSkew: 0.3,
+};
+
+function buildTurtle(root: Node, body: Node, params: Record<string, number>): CreatureAnimator {
+    const t = withParams(TURTLE, params);
+    const a = new CreatureAnimator('turtle', root, {
+        ...baseParams(params),
+        swayFrequency: t.bodyFrequency, finFrequency: t.strokeFrequency, waveK: 0, finFold: 0, steadyRhythm: true,
+        swimSwayFrequency: t.swimFrequency, swimFinFrequency: t.swimFrequency,
+    });
+
+    a.register(body, { amp: t.bodySway, bendScale: 1, pitchBend: true, axis: 0 });
+    const shell = child(body, 'Shell');
+    if (shell) a.register(shell, { amp: t.shellRoll, axis: 1 });
+
+    // cổ: quay âm quanh +X = ngẩng lên
+    chain(child(body, 'Neck')).forEach((n, i) => a.register(n, {
+        amp: t.swimNeckNod, bias: -t.swimNeckLift, lag: i * t.neckLag,
+        bendScale: t.neckBend, pitchBend: true, axis: 2, finAxis: new Vec3(1, 0, 0),
+        idleVariant: true, idleAmp: t.neckNod, idleBias: 0, idleLag: i * t.neckLag,
+    }));
+
+    const tail = chain(child(body, 'Spine') || child(body, 'Tail'));
+    tail.forEach((n, i) => a.register(n, {
+        along: 1, amp: t.tailSway * (i + 1) / Math.max(1, tail.length), lag: i * t.tailLag,
+        bendScale: 1, pitchBend: true, axis: 0,
+    }));
+
+    for (const legRoot of children(body, 'Leg_')) {
+        const segs = chain(legRoot);
+        const side = sideSign(a.local(segs[0]), sideFromName(legRoot));
+        const front = nameHas(legRoot, '_F_');
+        const axis = a.dir(segs[0], tip(segs[segs.length - 1]), new Vec3(side, 0, 0));
+        const sideLag = side < 0 ? 0 : t.flipperPhaseOffset;
+        const idleScale = front ? 1 : t.backScale;
+        const swimScale = front ? 1 : t.swimBackScale;
+        segs.forEach((n, i) => {
+            const r = i === 0;
+            const seg = r ? 1 : 0.6;
+            a.register(n, {
+                sideFin: true, along: 0.5, axis: 1, finAxis: axis, side, foldScale: 0,
+                amp: t.swimFlipperAngle * swimScale * seg,
+                bias: front && r ? -t.swimFlipperDrop : 0,                     // quét dương = nâng lên: hạ tâm quạt = bias âm, chỉ ở gốc
+                skew: -(front ? t.swimStrokeSkew : t.swimBackSkew),           // skew âm: nửa xuống nhanh, nửa lên chậm
+                lag: i * t.flipperLag + sideLag + (front ? 0 : t.swimBackPhaseOffset),
+                twistAmp: t.flipperTwist * idleScale * (r ? 1 : 0.5),
+                idleVariant: true, idleAmp: t.flipperAngle * idleScale * seg, idleBias: 0, idleSkew: 0,
+                idleLag: i * t.flipperLag + sideLag + (front ? 0 : t.backPhaseOffset),
             });
         });
     }
