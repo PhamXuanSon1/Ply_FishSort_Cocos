@@ -62,7 +62,7 @@ export class Bubble extends PoolMember {
             let fish = room.getSrc(d);
             let f = thing.getComponentInChildren(Fish);
             fish.parent = f.node;
-            fish.position = v3(0, 0, 0);
+            room.centerSrc(fish, d);
             fish.eulerAngles = v3(0, 0, 0);
             fish.scale = v3(1, 1, 1);
             fish.active = true;
@@ -142,8 +142,9 @@ export class Bubble extends PoolMember {
     static reachOf(type: number) {
         if(Bubble.fishReach.has(type)) return Bubble.fishReach.get(type);
         let pts = room.getFishPoints(type);
+        let c = room.getFishCenter(type);
         let r = 0;
-        for(let i = 0; pts && i < pts.length; i += 3) r = Math.max(r, Math.hypot(pts[i], pts[i + 1], pts[i + 2]));
+        for(let i = 0; pts && i < pts.length; i += 3) r = Math.max(r, Math.hypot(pts[i] - c.x, pts[i + 1] - c.y, pts[i + 2] - c.z));
         Bubble.fishReach.set(type, r);
         return r;
     }

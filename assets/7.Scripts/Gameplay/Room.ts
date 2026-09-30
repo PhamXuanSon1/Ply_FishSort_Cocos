@@ -875,7 +875,7 @@ export class Room extends Component {
             let fish = this.getSrc(key);
             let f = tt.getComponentInChildren(Fish)
             fish.parent = f.node;
-            fish.position = v3(0, 0, 0);
+            this.centerSrc(fish, key);
             fish.eulerAngles = v3(0, 0, 0);
             fish.scale = v3(1, 1, 1);
             fish.active = true;
@@ -896,20 +896,39 @@ export class Room extends Component {
     @property
     tankFill: number = 0.8;
     fishPoints: Map<number, Float32Array> = new Map();
+    fishCenter: Map<number, Vec3> = new Map();
+
+    /** Tâm mesh (AABB) của cá mẫu trong local SK_FishN - scale RootNode quanh gốc của nó sẽ làm tâm này lệch khỏi gốc. */
+    getFishCenter(type: number) {
+        if(this.fishCenter.has(type)) return this.fishCenter.get(type);
+        let pts = this.getFishPoints(type);
+        let c = v3();
+        if(pts && pts.length) {
+            let min = v3(Infinity, Infinity, Infinity), max = v3(-Infinity, -Infinity, -Infinity), p = v3();
+            for(let i = 0; i < pts.length; i += 3) {
+                p.set(pts[i], pts[i + 1], pts[i + 2]);
+                Vec3.min(min, min, p);
+                Vec3.max(max, max, p);
+            }
+            c.set((min.x + max.x) / 2, (min.y + max.y) / 2, (min.z + max.z) / 2);
+        }
+        this.fishCenter.set(type, c);
+        return c;
+    }
 
     /**
-     * Scale đều + dời cá (bản clone SK_FishN trong Avatar của slot) để cạnh lớn nhất bằng tankFill khung FishTank
-     * và tâm mesh trùng tâm FishTank. Camera UI orthographic nên chỉ so trên mặt phẳng XY (world).
+     * Dời bản clone SK_FishN (rotation 0, scale 1 trong node Fish) để tâm mesh trùng gốc node Fish - tâm xoay / điểm
+     * bay tới hộp, slot. Nhờ vậy chỉnh position / scale RootNode của cá mẫu thế nào cá cũng không bị lệch.
      */
-    fitInTank(slot: Slot, fish: Node, type: number) {
-        let tank: Node = null;
-        Ulis.allNode(slot.node, n => { if(!tank && /^FishTank/i.test(n.name)) tank = n; });
-        let ut = tank?.getComponent(UITransform);
-        let pts = this.getFishPoints(type);
-        if(!ut || !pts || pts.length == 0) return;
+    centerSrc(fish: Node, type: number) {
+        let c = this.getFishCenter(type);
+        fish.setPosition(-c.x, -c.y, -c.z);
+    }
 
-        // AABB world của cá: chiếu từng đỉnh (local SK_FishN) qua worldMatrix của clone - hộp 8 góc bị phình khi cá xoay
-        let m = fish.worldMatrix;
+    /** AABB world (XY) của cá loại type nếu đặt theo worldMatrix m (đỉnh local SK_FishN). */
+    projectedSize(type: number, m: Mat4): [number, number, Vec3] {
+        let pts = this.getFishPoints(type);
+        if(!pts || pts.length == 0) return [0, 0, null];
         let min = v3(Infinity, Infinity, Infinity), max = v3(-Infinity, -Infinity, -Infinity), p = v3();
         for(let i = 0; i < pts.length; i += 3) {
             p.set(pts[i], pts[i + 1], pts[i + 2]);
@@ -917,14 +936,33 @@ export class Room extends Component {
             Vec3.min(min, min, p);
             Vec3.max(max, max, p);
         }
-        let w = max.x - min.x, h = max.y - min.y;
+        return [max.x - min.x, max.y - min.y, v3((min.x + max.x) / 2, (min.y + max.y) / 2, (min.z + max.z) / 2)];
+    }
+
+    /**
+     * Scale + dời cá (bản clone SK_FishN trong Avatar của slot) cho tâm mesh trùng tâm FishTank. Hệ số scale dùng chung
+     * mọi loại đang chơi (loại to nhất vừa tankFill khung FishTank) nên tỉ lệ to/nhỏ giữa các loại giữ đúng như cá mẫu
+     * - chỉnh scale RootNode của cá mẫu thì cá trong slot cũng to/nhỏ theo. Camera UI orthographic nên chỉ so trên XY.
+     */
+    fitInTank(slot: Slot, fish: Node, type: number) {
+        let tank: Node = null;
+        Ulis.allNode(slot.node, n => { if(!tank && /^FishTank/i.test(n.name)) tank = n; });
+        let ut = tank?.getComponent(UITransform);
+        if(!ut) return;
+
+        let m = fish.worldMatrix;
+        let [w, h, c] = this.projectedSize(type, m);
         if(!(w > 0 && h > 0)) return;
 
         let rect = ut.getBoundingBoxToWorld();
-        let k = this.tankFill * Math.min(rect.width / w, rect.height / h);
+        let k = Infinity;
+        this.fishTypes.forEach(t => {
+            let [tw, th] = this.projectedSize(t, m);
+            if(tw > 0 && th > 0) k = Math.min(k, rect.width / tw, rect.height / th);
+        });
+        k = this.tankFill * (isFinite(k) ? k : Math.min(rect.width / w, rect.height / h));
         // scale quanh gốc clone O: tâm c -> O + k (c - O), rồi dời để tâm về giữa FishTank
         let o = fish.worldPosition.clone();
-        let c = v3((min.x + max.x) / 2, (min.y + max.y) / 2, (min.z + max.z) / 2);
         let cNew = Vec3.scaleAndAdd(v3(), o, Vec3.subtract(v3(), c, o), k);
         fish.setScale(k, k, k);
         fish.setWorldPosition(o.x + rect.center.x - cNew.x, o.y + rect.center.y - cNew.y, o.z);
