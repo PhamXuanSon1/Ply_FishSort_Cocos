@@ -149,7 +149,6 @@ export class Room extends Component {
     
     mat: Mats = null
     initMats() {
-        this.fish = this.node.getChildByName("Fish");
         this.mat = this.node.getChildByName("Material").getComponentInChildren(Mats);
         this.mat.init();
     }
@@ -600,7 +599,7 @@ export class Room extends Component {
         
         if(t) {
             let th = t.getComponent(Thing);
-            if(!this.firstHandHintShown && !this.firstHandHintScheduled && this.fisrtTapCount > 0) {
+            if(!this.firstHandHintShown && !this.firstHandHintScheduled) {
                 this.firstHandHintScheduled = true;
                 this.firstHandHintTween = tween({})
                 .delay(Math.max(0, this.handHintDelay))
@@ -613,7 +612,7 @@ export class Room extends Component {
                     }
                 })
                 .start();
-            } else if(this.firstHandHintShown || this.fisrtTapCount <= 0) {
+            } else if(this.firstHandHintShown) {
                 ui?.handTap(th.touch);
             }
         } else {

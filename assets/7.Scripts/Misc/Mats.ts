@@ -1,4 +1,4 @@
-import { _decorator, CCObject, Color, color, Component, EventHandler, gfx, instantiate, JsonAsset, Material, MeshRenderer, Node, Texture2D, v2, v3, Vec3 } from 'cc';
+import { _decorator, CCObject, Color, color, Component, EventHandler, instantiate, JsonAsset, Material, MeshRenderer, Node, Texture2D, v2, v3, Vec3 } from 'cc';
 const { ccclass, property } = _decorator;
 
 @ccclass('Mats')
@@ -76,18 +76,13 @@ export class Mats extends Component {
             "emissive", 
             "emissiveScale", 
             "useOutline", 
-            "twoSided",
             "lineWidth",
-            "selectLineWidth",
-            "lineWidthScales",
             "dis"
         ]
         let data = {};
         keys.forEach(k => data[k] = this[k]);
         data["colors"] = this.colors.map(c => c.toHEX());
         data["emissive"] = this.emissive.toHEX();
-        data["lineColor"] = this.lineColor.toHEX();
-        data["selectLineColor"] = this.selectLineColor.toHEX();
         console.log(JSON.stringify(data));
         downloadJson(data, this.fileName + "MatData.json");
     }
@@ -107,8 +102,6 @@ export class Mats extends Component {
         });
         this.colors = this.jsonData.json["colors"].map(c => color().fromHEX(c));
         this.emissive = color().fromHEX(this.jsonData.json["emissive"]);
-        if(this.jsonData.json["lineColor"]) this.lineColor = color().fromHEX(this.jsonData.json["lineColor"]);
-        if(this.jsonData.json["selectLineColor"]) this.selectLineColor = color().fromHEX(this.jsonData.json["selectLineColor"]);
         this.dis = v2(this.jsonData.json["dis"].x, this.jsonData.json["dis"].y);
         this.init();
     }
@@ -202,38 +195,15 @@ export class Mats extends Component {
     // outline
     @property
     useOutline: boolean = true;   
-    // vây / đuôi là mặt phẳng hở (vd Fish27, Fish28): pass chính cull back nên nhìn từ sau chỉ còn pass outline
-    // (vẽ mặt sau) -> mảng đen. Bật: pass chính vẽ 2 mặt + USE_TWOSIDE, pass outline giữ nguyên
-    @property({tooltip: "Vẽ 2 mặt cho pass chính - sửa vây/đuôi bị đen ở model có mặt phẳng hở"})
-    twoSided: boolean = true;
-
-    // viền lúc bình thường: cá trong bong bóng, hộp chờ, slot (không được chọn). Độ dày tính bằng pixel màn hình
-    // (shader đẩy viền theo pixel) nên đều nhau với mọi model / mọi cỡ
-    @property({slide: true, range: [0, 20], step: 0.1, tooltip: "Độ dày viền lúc bình thường (pixel)", visible() {
+    @property({slide: true, range: [0, 1000000], step: 100000, visible() {
         return this.useOutline
     },})
-    lineWidth: number = 2;
-    @property({tooltip: "Màu viền lúc bình thường", visible() {
-        return this.useOutline
-    },})
-    lineColor: Color = color(0, 0, 0, 255);
-    // viền khi cá được chọn và bay lên slot
-    @property({slide: true, range: [0, 20], step: 0.1, tooltip: "Độ dày viền khi cá được chọn bay lên slot (pixel)", visible() {
-        return this.useOutline
-    },})
-    selectLineWidth: number = 3;
-    @property({tooltip: "Màu viền khi cá được chọn bay lên slot", visible() {
-        return this.useOutline
-    },})
-    selectLineColor: Color = color(255, 204, 0, 255);
-    // hệ số độ dày viền theo loại cá (index = loại cá, như colors / textures), nhân vào cả lineWidth lẫn
-    // selectLineWidth. Thiếu phần tử = 1; init() tự nới mảng cho đủ số loại để chỉnh trên Inspector
-    @property({type: [Number], tooltip: "Hệ số độ dày viền theo loại cá (index = loại cá). 1 = giữ nguyên, 0 = tắt viền loại đó", visible() {
-        return this.useOutline
-    },})
-    lineWidthScales: number[] = [];
-    // material khi được chọn, song song với mats (cùng index = loại cá), chỉ khác màu + độ dày viền
-    selectMats: Material[] = [];
+    lineWidth: number = 10;
+    @property({ tooltip: "Màu viền cá ở trạng thái bình thường." })
+    normalOutlineColor: Color = color(0, 0, 0, 255);
+    // loại cá có vây phẳng mỏng: model đã bake vertex color (vây = đen) -> pass viền bỏ phần vây (USE_FIN_MASK)
+    @property({ type: [Number], tooltip: "Loại cá có vây mỏng: không vẽ viền lên vây (model phải có vertex color, vây = đen)" })
+    finMaskTypes: number[] = [26, 27];
 
     @property([Material])
     defaultMats: Material[] = [];
@@ -243,41 +213,30 @@ export class Mats extends Component {
         this.mats.forEach((m, i) => {
             this.changeMat(m, i);            
         });
-        this.selectMats.forEach((m, i) => {
-            this.changeMat(m, i, true);
-        });
         
     }
 
-    getClone(i: number, selected: boolean = false) {
+    getClone(i: number) {
         let m = new Material();
+        m.copy(this.mat
         // custom define-marcos
-        let info: any = {
-            defines: {
-                // độ dày 0 (vd lineWidthScales[i] = 0) = bỏ hẳn pass viền, không vẽ gì
-                USE_OUTLINE_PASS: this.useOutline && (selected ? this.selectLineWidth : this.lineWidth) * (this.lineWidthScales[i] ?? 1) > 0,
-                FIXED_LIGHTING : this.fixedLighting,
-                CLAMP_BRIGHTNESS : this.clamBrightness,
-                ENABLE_GLOW: this.enableGlow,
-                USE_ALBEDO_MAP: this.useTexture && this.textures[i] !== undefined,
-                USE_NORMAL_MAP: this.useNormalMap && this.normalMaps[i] !== undefined,
-                // pass viền đọc alpha texture cá: vây cắt hình bằng alpha thì phần trong suốt không vẽ viền
-                USE_BASE_COLOR_MAP: this.useTexture && !!this.textures[i],
+        ,   {
+                defines: {
+                    USE_OUTLINE_PASS: this.useOutline,
+                    FIXED_LIGHTING : this.fixedLighting,
+                    CLAMP_BRIGHTNESS : this.clamBrightness,
+                    ENABLE_GLOW: this.enableGlow,
+                    USE_ALBEDO_MAP: this.useTexture && this.textures[i] !== undefined,
+                    USE_NORMAL_MAP: this.useNormalMap && this.normalMaps[i] !== undefined,
+                    USE_FIN_MASK: this.useOutline && this.finMaskTypes.includes(i),
+                }
             }
-        };
-        m.copy(this.mat, info);
-        if(this.twoSided) {
-            // biết danh sách pass (phụ thuộc defines) rồi mới gán state: bỏ cull mọi pass trừ pass outline
-            info.defines.USE_TWOSIDE = true;
-            info.states = m.passes.map(p => String(p.program).indexOf('silhouette-edge') >= 0
-                ? {} : { rasterizerState: { cullMode: gfx.CullMode.NONE } });
-            m.copy(this.mat, info);
-        }
-        this.changeMat(m, i, selected);
+        );
+        this.changeMat(m, i);
         return m;
     }
 
-    changeMat(m: Material, i: number, selected: boolean = false) {
+    changeMat(m: Material, i: number) {
         m.setProperty("brightness", this.brightness);
         m.setProperty("contrast", this.contrast);
         m.setProperty("saturation", this.saturation);
@@ -288,14 +247,18 @@ export class Mats extends Component {
         let c = this.colors[i] ? this.colors[i].clone() : color();
         if(this.useColor && this.colors[i]) {
             m.setProperty("mainColor", c)
+
+            // outline color
+            let a = this.colors[i].clone();
+            let dt = 150;
+            if(a.r > dt) a.r -= dt; else a.r = 20;
+            if(a.g > dt) a.g -= dt; else a.g = 20;
+            if(a.b > dt) a.b -= dt; else a.b = 20;
+            m.setProperty("baseColor", a)
         }
-        // outline: màu + độ dày theo trạng thái (bình thường / được chọn)
-        m.setProperty("baseColor", selected ? this.selectLineColor : this.lineColor);
 
         if(this.useTexture) {
             this.textures[i] && m.setProperty("mainTexture", this.textures[i]);
-            // chỉ khi material có pass viền (độ dày 0 thì không có pass này)
-            if(this.textures[i] && m.passes.some(p => String(p.program).indexOf("silhouette-edge") >= 0)) m.setProperty("baseColorMap", this.textures[i]);
         }
 
         if(this.useNormalMap) {
@@ -325,8 +288,7 @@ export class Mats extends Component {
         if(gl.b < 0) gl.b = 0;
         m.setProperty("glowColor", gl);
 
-        let scale = this.lineWidthScales[i] ?? 1;
-        m.setProperty("lineWidth", (selected ? this.selectLineWidth : this.lineWidth) * scale);
+        m.setProperty("lineWidth", this.lineWidth);
     }
 
     inited: boolean = false;
@@ -336,7 +298,6 @@ export class Mats extends Component {
         this.colors = colors;
         this.inited = true;
         this.mats = [];
-        this.selectMats = [];
         // lấy MAX trong các nguồn đang bật, không phải ưu tiên 1 nguồn - nếu bật cả useColor lẫn useTexture mà
         // 2 mảng dài ngắn khác nhau thì vẫn phải tạo đủ material để phủ hết nguồn dài nhất.
         let length = Math.max(
@@ -344,11 +305,9 @@ export class Mats extends Component {
             this.useTexture ? this.textures.length : 0,
             this.useNormalMap ? this.normalMaps.length : 0,
         );
-        while(this.lineWidthScales.length < length) this.lineWidthScales.push(1);
         for (let i = 0; i < length; i++) {
             let m = this.getClone(i);
             this.mats.push(m);
-            this.selectMats.push(this.getClone(i, true));
         }
         if(this.inited) {
             this.onColorChangeds.forEach((e) => e.emit([]));

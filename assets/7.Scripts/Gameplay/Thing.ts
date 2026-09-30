@@ -1,4 +1,4 @@
-import { _decorator, Animation, color, Component, Enum, EventTouch, instantiate, Layers, Material, MeshRenderer, Node, Size, SkinnedMeshRenderer, sp, Sprite, SpriteFrame, Tween, tween, UIRenderer, UITransform, v3, Vec3 } from 'cc';
+import { _decorator, Animation, Color, color, Component, Enum, EventTouch, instantiate, Layers, Material, MeshRenderer, Node, Size, SkinnedMeshRenderer, sp, Sprite, SpriteFrame, Tween, tween, UIRenderer, UITransform, v3, Vec3 } from 'cc';
 import { PoolMember } from '../Pool/PoolMember';
 import { room } from './Room';
 import Ulis from '../Misc/Ulis';
@@ -37,11 +37,16 @@ export class Thing extends PoolMember {
     inited: boolean = false;
     moving: boolean = false;
     waiting: boolean = false;
+    private highlightOutlineColor: Color | null = null;
     init(toucable: boolean = true) {
         this.setMeshMat();
         if(this.inited) return;
         this.moving = false;
         this.inited = true;
+        const mesh = this.getComponentInChildren(MeshRenderer);
+        const outlineColor = mesh?.material?.getProperty("baseColor") as Color | undefined;
+        this.highlightOutlineColor = outlineColor?.clone() ?? null;
+        this.offHightlight();
         this.fish = this.getComponentInChildren(Fish);
         this.touch = this.node.getChildByName("Touch");
         toucable && this.onTouch();
@@ -53,8 +58,7 @@ export class Thing extends PoolMember {
         // console.log(mesh);
         // let mat = room.mat.getClone(this.thingType);
         let mat = room.mat.mats[this.thingType];
-        // sharedMaterial, không dùng mesh.material: getter đó tạo material instance riêng, đè lên viền theo trạng thái
-        mesh && !mesh.sharedMaterial && mesh.setSharedMaterial(mat, 0);
+        mesh && !mesh.material && mesh.setSharedMaterial(mat, 0);
     }
 
 
@@ -108,23 +112,23 @@ export class Thing extends PoolMember {
         ipm.fisrtTap();   
     }
 
-    // đã được chọn bay lên slot: giữ viền vàng, highlight / bỏ highlight không được đổi lại
-    toSlot: boolean = false;
-
-    /** Viền theo trạng thái: selected = viền chọn (Mats.selectMats: màu + độ dày select), còn lại viền thường (Mats.mats). */
-    setOutline(selected: boolean) {
-        let m = selected ? room.mat.selectMats[this.thingType] : room.mat.mats[this.thingType];
-        if(!m) return;
-        this.getComponentsInChildren(MeshRenderer).forEach(r => r.setSharedMaterial(m, 0));
-    }
-
-    // highlight khi kéo qua = viền chọn; dùng material chung, không tạo material instance
     onHightlight() {
-        this.setOutline(true);
+        let mesh = this.getComponentInChildren(MeshRenderer);
+        if(mesh) {
+            if(this.highlightOutlineColor) {
+                mesh.material.setProperty("baseColor", this.highlightOutlineColor);
+            }
+            mesh.material.setProperty("lineWidth", 600000);
+        }
     }
 
     offHightlight() {
-        if(!this.toSlot) this.setOutline(false);
+        let mesh = this.getComponentInChildren(MeshRenderer);
+        if(mesh) {
+            mesh.material.setProperty("baseColor", room.mat.normalOutlineColor);
+            mesh.material.setProperty("lineWidth", 100000);
+        }
+
     }
 
     

@@ -115,16 +115,12 @@ CCEffect %{
     - switch: USE_OUTLINE_PASS
       vert: silhouette-edge-vs
       frag: silhouette-edge-fs
-      # vẽ sau mọi pass chính (queue sắp theo priority tăng dần). Lọc mặt sau ở fragment theo pháp tuyến (không cull
-      # theo thứ tự đỉnh: vài model bị lật winding khi convert); depth LESS (không bằng): chỗ viền trùng khít tam giác
-      # pass chính (vây phẳng nhìn thẳng mặt) thì pass chính thắng. Không ghi depth.
-      priority: 200
       rasterizerState: &r1
-        cullMode: none
+        cullMode: front
       depthStencilState: &d1
-        depthFunc: less
+        depthFunc: less_equal
         depthTest: true
-        depthWrite: false
+        depthWrite: true
       properties:
         lineWidth:     { value: 10, target: outlineParams.x }
         depthBias:     { value: 0,  target: outlineParams.y }
@@ -169,29 +165,31 @@ CCEffect %{
 CCProgram surface-vertex-silhouette-edge %{
   
   uniform OutlineVert {
-  vec4 outlineParams; // x: line width (pixel màn hình), y: depth hack
+  vec4 outlineParams; // x: line width, y: depth hack
 };
 
-  // Viền theo pixel màn hình: đẩy đỉnh (mặt sau) theo hướng pháp tuyến ĐÃ CHIẾU lên màn hình đúng outlineParams.x
-  // pixel - dày đều bất kể cỡ / scale / đơn vị của model, và mesh chỉ lệch vài pixel nên vây phẳng hở không lòi
-  // mảng đen như cách đẩy theo pháp tuyến local cũ.
+  #define CC_SURFACES_VERTEX_MODIFY_LOCAL_POS
+  vec3 SurfacesVertexModifyLocalPos(in SurfacesStandardVertexIntermediate In)
+  {
+    float width = outlineParams.x * 0.001;
+    vec3 localPos = In.position.xyz;
+
+  #if USE_POSITION_SCALING
+    vec3 dir = normalize(localPos);
+    float flip = dot(dir, normalize(In.normal)) < 0.0 ? -1.0 : 1.0;
+    localPos += flip * dir * width * 2.0;
+  #else
+    localPos += normalize(In.normal) * width;
+  #endif
+    return localPos;
+  }
+
   #define CC_SURFACES_VERTEX_MODIFY_CLIP_POS
   vec4 SurfacesVertexModifyClipPos(in SurfacesStandardVertexIntermediate In)
   {
-    // không đẩy depth: đỉnh không bị dời thì z giống hệt pass chính -> depth LESS cho pass chính thắng
     vec4 clipPos = In.clipPos;
-    vec3 viewNormal = (cc_matView * vec4(In.worldNormal.xyz, 0.0)).xyz;
-    // hướng pháp tuyến trên màn hình, tính trong không gian pixel để không méo theo tỉ lệ khung hình
-    vec2 dir = (cc_matProj * vec4(viewNormal, 0.0)).xy * cc_screenSize.xy;
-    float len = length(dir);
-    if (len > 1e-6) {
-      dir /= len;
-      // độ "nằm ở mép": pháp tuyến vuông góc hướng nhìn (mép thân cá) = 1, nhìn thẳng mặt (vây phẳng quay về
-      // camera) = 0 -> vây không bị dời, trùng khít pass chính nên không lộ mảng màu viền
-      float edge = length(viewNormal.xy) / max(length(viewNormal), 1e-6);
-      // pixel -> NDC (2 / size), nhân w để giữ đúng sau phép chia phối cảnh
-      clipPos.xy += dir * edge * outlineParams.x * 2.0 * cc_screenSize.zw * clipPos.w;
-    }
+    float scaleZ = cc_nearFar.z == 0.0 ? 0.5 : 1.0;
+    clipPos.z -= outlineParams.y * 0.002 * scaleZ;
     return clipPos;
   }
 }%
@@ -217,17 +215,16 @@ CCProgram surface-fragment-silhouette-edge %{
 
   vec4 SurfacesFragmentModifyBaseColorAndTransparency()
   {
-    // chỉ giữ mặt quay ra xa camera (view space nhìn theo -z: pháp tuyến có z > 0 là quay về camera). Dùng pháp
-    // tuyến thay vì cull để đúng cả với model bị lật thứ tự đỉnh.
-    vec3 viewN = (cc_matView * vec4(FSInput_worldNormal.xyz, 0.0)).xyz;
-    if (viewN.z > 0.0) discard;
+    #if USE_FIN_MASK
+      // vây mỏng (vertex color đen) không vẽ viền
+      if (FSInput_vertexColor.r < 0.5) discard;
+    #endif
     vec4 color = vec4(cc_mainLitColor.rgb, 1.0);
     color.rgb = SRGBToLinear(baseColor.rgb);
     #if USE_BASE_COLOR_MAP
-      // baseColorMap = texture của cá (Mats gán), chỉ dùng alpha: vây / đuôi là mặt phẳng cắt hình bằng alpha
-      // (vd T_Fish27_D, T_Fish28_D), pass chính alpha test bỏ phần trong suốt -> viền cũng phải bỏ, không thì
-      // cả tấm mặt phẳng bị tô màu viền. Cùng ngưỡng 0.5 với alphaThreshold của pass chính.
-      if (texture(baseColorMap, FSInput_texcoord).a < 0.5) discard;
+      vec4 texColor = texture(baseColorMap, FSInput_texcoord);
+      texColor.rgb = SRGBToLinear(texColor.rgb);
+      color *= texColor;
     #endif
 
     
@@ -247,9 +244,21 @@ CCProgram surface-fragment-silhouette-edge %{
   }
 }%
 
+// Như surfaces/effect-macros/silhouette-edge, nhưng USE_FIN_MASK bật vertex color: model có vây phẳng mỏng
+// (vd SK_Fish27 / SK_Fish28) được bake COLOR_0 = đen ở vây, trắng ở thân -> pass viền bỏ phần vây.
+CCProgram silhouette-edge-macros %{
+  #pragma define-meta USE_FIN_MASK
+  #define CC_SURFACES_USE_TANGENT_SPACE 0
+  #define CC_SURFACES_USE_VERTEX_COLOR USE_FIN_MASK
+  #define CC_SURFACES_USE_SECOND_UV 0
+  #define CC_SURFACES_USE_LIGHT_MAP 0
+  #define CC_SURFACES_TRANSFER_LOCAL_POS 0
+  #include <surfaces/effect-macros/common-macros>
+}%
+
 CCProgram silhouette-edge-vs %{
   precision highp float;
-  #include <surfaces/effect-macros/silhouette-edge>
+  #include <silhouette-edge-macros>
   #include <surfaces/includes/common-vs>
   #include <surface-vertex-silhouette-edge>
   #include <shading-entries/main-functions/misc/silhouette-edge-vs>
@@ -257,7 +266,7 @@ CCProgram silhouette-edge-vs %{
 
 CCProgram silhouette-edge-fs %{
   precision highp float;
-  #include <surfaces/effect-macros/silhouette-edge>
+  #include <silhouette-edge-macros>
   #include <surfaces/includes/common-fs>
   #include <surface-fragment-silhouette-edge>
   #include <shading-entries/main-functions/misc/silhouette-edge-fs>
