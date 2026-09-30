@@ -227,6 +227,8 @@ export class Fish extends Component {
     get usingClip(): boolean { return this.clipAnim !== null; }
 
     private moveTween: Tween<Node> | null = null;
+    /** Luôn nhìn thẳng camera (sao, sò...): FishMove / moveToCenter không xoay nghiêng Y. Room.frontTypes gán. */
+    faceFront = false;
 
     /**
      * Tween mượt vị trí LOCAL của cá về gốc (0,0,0) - dùng khi cá bị tách khỏi hệ quản lý vị trí (ví dụ
@@ -235,7 +237,7 @@ export class Fish extends Component {
     moveToCenter(duration = 0.3): void {
         this.moveTween?.stop();
         this.moveTween = tween(this.node)
-            .to(duration, { position: new Vec3(), eulerAngles: v3(0, 50, 0) }, { easing: 'quadOut' })
+            .to(duration, { position: new Vec3(), eulerAngles: v3(0, this.faceFront ? 0 : 50, 0) }, { easing: 'quadOut' })
             .start();
     }
 

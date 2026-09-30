@@ -151,6 +151,7 @@ export class Slot extends PoolMember {
 
         if(room.lose) return;
 
+        thing.onHightlight();
         sm.playSound(SoundType.Pick);
         let bubble = null;
         let star = null;
@@ -254,6 +255,7 @@ export class Slot extends PoolMember {
             this.movingCount--;
 
             thing.moving = false;
+            if(!this.isSlot) thing.offHightlight();
             if(this.isSlot) {
                 thing.fish?.setAnim(false);
                 thing.node.active = false;

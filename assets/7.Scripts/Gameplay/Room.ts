@@ -1,4 +1,4 @@
-import { _decorator, Animation, CCObjectFlags, Component, EventKeyboard, EventTouch, gfx, Input, input, instantiate, JsonAsset, KeyCode, Mat4, Mesh, MeshRenderer, misc, Node, PhysicsSystem, PhysicsSystem2D, Scene, SkinnedMeshRenderer, Sprite, Tween, tween, UITransform, v2, v3, Vec2, Vec3 } from 'cc';
+import { _decorator, Animation, CCObjectFlags, Component, EventKeyboard, EventTouch, gfx, Input, input, instantiate, JsonAsset, KeyCode, Mat4, Mesh, MeshRenderer, misc, Node, PhysicsSystem, Quat, PhysicsSystem2D, Scene, SkinnedMeshRenderer, Sprite, Tween, tween, UITransform, v2, v3, Vec2, Vec3, view } from 'cc';
 import { Thing } from './Thing';
 import { Slot } from './Slot';
 import { ipm } from '../Manager/InputManager';
@@ -30,7 +30,7 @@ export var room: Room = null;
  */
 export const BubbleData: 
 [number, number, number[]][] = 
-[[132.428,1268.46,[26,26]],[-621.029,874.37,[32,29,33]],[620.997,1242.781,[29,27,37]],[-331.329,1268.474,[23,23]],[311.746,840.762,[26,23]],[710.886,827.523,[27]],[710.774,492.52,[23]],[-147.621,672.359,[32,29,27]],[245.951,381.656,[27,26]],[-226.381,189.451,[23,26]],[620.976,67.396,[37,23,32]],[-646.47,385.848,[30,37]],[125.572,0.849,[30]],[-646.417,-77.964,[37,29]],[-181.644,-297.852,[26,26,23]],[-620.956,-566.574,[29,33,27]],[342.884,-253.975,[23]],[101.306,-697.127,[23,37]],[-602.293,-1099.642,[33,32,33,30]],[-56.128,-1180.229,[26,33,32,30]],[602.341,-613.586,[30,27,26,37]],[495.364,-1155.148,[32,30,29,33]]]
+[[132.428,1268.46,[29,32]],[-621.029,874.37,[23,23,29]],[620.997,1242.781,[30,39,32]],[-331.329,1268.474,[30,30]],[311.746,840.762,[39,29]],[710.886,827.523,[32]],[710.774,492.52,[23]],[-147.621,672.359,[37,39,37]],[245.951,381.656,[33,23]],[-226.381,189.451,[38,33]],[620.976,67.396,[39,29,29]],[-646.47,385.848,[30,38]],[125.572,0.849,[29,29]],[-646.417,-77.964,[30,39]],[-181.644,-297.852,[33,30,33]],[-620.956,-566.574,[38,38,38]],[342.884,-253.975,[37,33,23]],[101.306,-697.127,[23,29,32]],[-602.293,-1099.642,[23,32,32]],[-56.128,-1180.229,[39,23,33]],[602.341,-613.586,[29,23,37]],[495.364,-1155.148,[38,37,37]]]
 
 /**
  * Thứ tự hộp ra slot, tính từ BubbleData (không hard code): mỗi loại cá n con -> n/3 nhóm [t, t, t].
@@ -605,7 +605,8 @@ export class Room extends Component {
                 .delay(Math.max(0, this.handHintDelay))
                 .call(() => {
                     this.firstHandHintScheduled = false;
-                    const nextHint = this.taps[0]?.getComponent(Thing);
+                    // chỉ vào đúng con vừa lấy ra (t), không phải con kế tiếp; nó đã bị chọn rồi thì mới sang con sau
+                    const nextHint = th?.node?.isValid && this.things.includes(th) ? th : this.taps[0]?.getComponent(Thing);
                     if(!this.lose && this.tappable && nextHint?.touch?.isValid) {
                         this.firstHandHintShown = true;
                         ui?.handTap(nextHint.touch);
@@ -760,6 +761,11 @@ export class Room extends Component {
     // hệ số vùng bắt khi kéo, nhân với nửa cạnh node Touch của cá
     @property
     dragHitScale: number = 1;
+    // loại luôn nhìn thẳng (không xoay nghiêng 45° trong bong bóng): 23 sao, 29 sò, 35 sò đỏ
+    @property({ type: [Number], tooltip: "Loại cá luôn nhìn thẳng, không xoay nghiêng khi bơi trong bong bóng" })
+    frontTypes: number[] = [23, 29, 35];
+    @property({ tooltip: "z tối thiểu của node Avatar trong slot: phải đủ lớn để cả viền (mặt sau mesh) nằm trước khung slot" })
+    slotAvatarZ: number = 400;
 
     /** Khi đang kéo, chỉ highlight cá dưới ngón tay; thao tác chọn cá được xử lý khi thả. */
     collectAt(pos: Vec2) {
@@ -901,7 +907,11 @@ export class Room extends Component {
             slot.setThingFrame(thing);    
             slot.added = 0;  
             slot.setLabel(array.length);
-            let p = slot.node.getChildByName("Avatar").children[0];
+            let avatarRoot = slot.node.getChildByName("Avatar");
+            // viền = mặt sau mesh, nằm sau thân cá (có con tới z <= 0) -> khung slot (sprite z = 0, vẽ sau, có depth test)
+            // đè mất viền. Camera orthographic nên đẩy Avatar lên trước không đổi kích thước hiển thị.
+            avatarRoot.setPosition(avatarRoot.position.x, avatarRoot.position.y, Math.max(avatarRoot.position.z, this.slotAvatarZ));
+            let p = avatarRoot.children[0];
             // if(!EDITOR_NOT_IN_PREVIEW) {
             //     let c = [...p.children];
             //     c.forEach(c => c.setParent(this.node, true));
@@ -930,6 +940,9 @@ export class Room extends Component {
             f.setAnim(false);
 
             tt.init(false);
+            tt.onHightlight();
+            // Avatar trong slot bị nghiêng (Avatar-001 Y 45°, Avatar Z -20°): loại nhìn thẳng thì khử về thẳng mặt camera
+            if(this.frontTypes.includes(key)) tt.node.setWorldRotation(Quat.IDENTITY);
             this.fitInTank(slot, fish, key);
 
         }
@@ -1132,11 +1145,31 @@ export class Room extends Component {
 
         try {
             if(!EDITOR_NOT_IN_PREVIEW) {
-                // Tutorial: chỉ vào 3 con cao nhất của loại cá ở slot đầu
-                let t0 = this.slots[0].thingType;
-                let things = this.things.filter(t => t.thingType == t0);
-                things.sort((a, b) => b.node.worldPosition.y - a.node.worldPosition.y);
-                this.taps = things.map(t => t.node).slice(0, 3);
+                // Tutorial: chỉ vào bong bóng CAO NHẤT ở cột giữa map có cá thuộc loại đang có trên slot, rồi 2 con cùng loại
+                // gần con đó nhất. Cột giữa = bong bóng đang thấy trên màn hình, cách trục giữa (tâm khung bao các bong bóng
+                // đang thấy) không quá 15% bề ngang; không có thì lấy bong bóng gần trục giữa nhất. Tọa độ world của UI =
+                // tọa độ màn hình.
+                let size = view.getVisibleSize();
+                let slotTypes = this.slots.map(s => s.thingType);
+                let visible = this.bubbles.filter(b => {
+                    let p = b.node.worldPosition;
+                    return p.x >= 0 && p.x <= size.width && p.y >= 0 && p.y <= size.height;
+                });
+                let pool = (visible.length ? visible : this.bubbles).filter(b => b.things.some(t => slotTypes.includes(t.thingType)));
+                let xs = (visible.length ? visible : this.bubbles).map(b => b.node.worldPosition.x);
+                let midX = xs.length ? (Math.min(...xs) + Math.max(...xs)) / 2 : size.width / 2;
+                let dx = (b: Bubble) => Math.abs(b.node.worldPosition.x - midX);
+                let column = pool.filter(b => dx(b) <= size.width * 0.15);
+                let bubble = column.length
+                    ? column.sort((a, b) => b.node.worldPosition.y - a.node.worldPosition.y)[0]
+                    : pool.sort((a, b) => dx(a) - dx(b))[0];
+                let first = bubble?.things.find(t => slotTypes.includes(t.thingType));
+                if(first) {
+                    let fp = first.node.worldPosition;
+                    let rest = this.things.filter(t => t != first && t.thingType == first.thingType);
+                    rest.sort((a, b) => Vec3.distance(a.node.worldPosition, fp) - Vec3.distance(b.node.worldPosition, fp));
+                    this.taps = [first, ...rest].map(t => t.node).slice(0, 3);
+                }
             }
             // .reverse();
             
@@ -1201,6 +1234,7 @@ export class Room extends Component {
 
     onTapThing(thing: Thing) {
         thing.offTouch();
+        thing.onHightlight();
         this.onFirst();
         this.onPickThing(thing);
         if(this.fisrtTapCount > 0) {

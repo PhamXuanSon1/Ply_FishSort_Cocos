@@ -201,9 +201,13 @@ export class Mats extends Component {
     lineWidth: number = 10;
     @property({ tooltip: "Màu viền cá ở trạng thái bình thường." })
     normalOutlineColor: Color = color(0, 0, 0, 255);
-    // loại cá có vây phẳng mỏng: model đã bake vertex color (vây = đen) -> pass viền bỏ phần vây (USE_FIN_MASK)
-    @property({ type: [Number], tooltip: "Loại cá có vây mỏng: không vẽ viền lên vây (model phải có vertex color, vây = đen)" })
-    finMaskTypes: number[] = [26, 27];
+    @property({ tooltip: "Màu viền cá khi được highlight trong Slot." })
+    highlightOutlineColor: Color = color(255, 204, 0, 255);
+    // lineWidth tính theo đơn vị mesh (x0.001), cá hiện tại ~0.02 world/đơn vị: 100000 chỉ ~2px nên viền đen gần như mất
+    @property({ tooltip: "Độ dày viền cá ở trạng thái bình thường (không click / kéo)." })
+    normalLineWidth: number = 300000;
+    @property({ tooltip: "Độ dày viền cá khi được highlight (kéo qua / chọn)." })
+    highlightLineWidth: number = 600000;
 
     @property([Material])
     defaultMats: Material[] = [];
@@ -227,8 +231,7 @@ export class Mats extends Component {
                     CLAMP_BRIGHTNESS : this.clamBrightness,
                     ENABLE_GLOW: this.enableGlow,
                     USE_ALBEDO_MAP: this.useTexture && this.textures[i] !== undefined,
-                    USE_NORMAL_MAP: this.useNormalMap && this.normalMaps[i] !== undefined,
-                    USE_FIN_MASK: this.useOutline && this.finMaskTypes.includes(i),
+                    USE_NORMAL_MAP: this.useNormalMap && this.normalMaps[i] !== undefined
                 }
             }
         );

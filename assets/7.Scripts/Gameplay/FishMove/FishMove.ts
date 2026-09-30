@@ -140,7 +140,7 @@ export class FishMove extends Component {
             }
 
             fish.node.position = pos;
-            fish.node.eulerAngles = v3(0, 45 * direct, 0);
+            fish.node.eulerAngles = v3(0, fish.faceFront ? 0 : 45 * direct, 0);
             Quat.copy(s.rotation, fish.node.rotation);
             Vec3.transformQuat(s.forward, Vec3.FORWARD, s.rotation);
 
@@ -299,7 +299,7 @@ export class FishMove extends Component {
             if(this.rotatable) {
                 let direct = s.forward.x < 0 ? 1 : -1;
                 if(this.size == 1) direct = this.node.position.x > 0 ? 1 : -1;
-                Quat.fromEuler(_tmpRot, 0, 45 * direct, 0);
+                Quat.fromEuler(_tmpRot, 0, s.fish.faceFront ? 0 : 45 * direct, 0);
                 rotateTowardsQuat(s.rotation, s.rotation, _tmpRot, clamp01(this.idleSpeed * dt));
                 s.fish.node.setRotation(s.rotation);
 
@@ -379,7 +379,8 @@ export class FishMove extends Component {
             const a = this.evalPos(s, Math.min(1, e + h));
             const b = this.evalPos(s, Math.max(0, e - h));
             const tangent = Vec3.subtract(new Vec3(), a, b);
-            if (tangent.lengthSqr() > 1e-8) {
+            // faceFront: không quay theo đường bơi, giữ nhìn thẳng
+            if (!s.fish.faceFront && tangent.lengthSqr() > 1e-8) {
                 Vec3.normalize(tangent, tangent);
                 const targetRot = FishMove.headingTowards(s.rotation, tangent);
                 rotateTowardsQuat(s.rotation, s.rotation, targetRot, this.turnSpeed * dt);

@@ -215,10 +215,6 @@ CCProgram surface-fragment-silhouette-edge %{
 
   vec4 SurfacesFragmentModifyBaseColorAndTransparency()
   {
-    #if USE_FIN_MASK
-      // vây mỏng (vertex color đen) không vẽ viền
-      if (FSInput_vertexColor.r < 0.5) discard;
-    #endif
     vec4 color = vec4(cc_mainLitColor.rgb, 1.0);
     color.rgb = SRGBToLinear(baseColor.rgb);
     #if USE_BASE_COLOR_MAP
@@ -244,21 +240,9 @@ CCProgram surface-fragment-silhouette-edge %{
   }
 }%
 
-// Như surfaces/effect-macros/silhouette-edge, nhưng USE_FIN_MASK bật vertex color: model có vây phẳng mỏng
-// (vd SK_Fish27 / SK_Fish28) được bake COLOR_0 = đen ở vây, trắng ở thân -> pass viền bỏ phần vây.
-CCProgram silhouette-edge-macros %{
-  #pragma define-meta USE_FIN_MASK
-  #define CC_SURFACES_USE_TANGENT_SPACE 0
-  #define CC_SURFACES_USE_VERTEX_COLOR USE_FIN_MASK
-  #define CC_SURFACES_USE_SECOND_UV 0
-  #define CC_SURFACES_USE_LIGHT_MAP 0
-  #define CC_SURFACES_TRANSFER_LOCAL_POS 0
-  #include <surfaces/effect-macros/common-macros>
-}%
-
 CCProgram silhouette-edge-vs %{
   precision highp float;
-  #include <silhouette-edge-macros>
+  #include <surfaces/effect-macros/silhouette-edge>
   #include <surfaces/includes/common-vs>
   #include <surface-vertex-silhouette-edge>
   #include <shading-entries/main-functions/misc/silhouette-edge-vs>
@@ -266,7 +250,7 @@ CCProgram silhouette-edge-vs %{
 
 CCProgram silhouette-edge-fs %{
   precision highp float;
-  #include <silhouette-edge-macros>
+  #include <surfaces/effect-macros/silhouette-edge>
   #include <surfaces/includes/common-fs>
   #include <surface-fragment-silhouette-edge>
   #include <shading-entries/main-functions/misc/silhouette-edge-fs>

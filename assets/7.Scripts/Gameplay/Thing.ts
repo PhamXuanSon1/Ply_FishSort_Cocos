@@ -37,15 +37,11 @@ export class Thing extends PoolMember {
     inited: boolean = false;
     moving: boolean = false;
     waiting: boolean = false;
-    private highlightOutlineColor: Color | null = null;
     init(toucable: boolean = true) {
         this.setMeshMat();
         if(this.inited) return;
         this.moving = false;
         this.inited = true;
-        const mesh = this.getComponentInChildren(MeshRenderer);
-        const outlineColor = mesh?.material?.getProperty("baseColor") as Color | undefined;
-        this.highlightOutlineColor = outlineColor?.clone() ?? null;
         this.offHightlight();
         this.fish = this.getComponentInChildren(Fish);
         this.touch = this.node.getChildByName("Touch");
@@ -113,22 +109,24 @@ export class Thing extends PoolMember {
     }
 
     onHightlight() {
-        let mesh = this.getComponentInChildren(MeshRenderer);
-        if(mesh) {
-            if(this.highlightOutlineColor) {
-                mesh.material.setProperty("baseColor", this.highlightOutlineColor);
-            }
-            mesh.material.setProperty("lineWidth", 600000);
-        }
+        this.setOutline(room.mat.highlightOutlineColor, room.mat.highlightLineWidth);
     }
 
     offHightlight() {
-        let mesh = this.getComponentInChildren(MeshRenderer);
-        if(mesh) {
-            mesh.material.setProperty("baseColor", room.mat.normalOutlineColor);
-            mesh.material.setProperty("lineWidth", 100000);
-        }
+        this.setOutline(room.mat.normalOutlineColor, room.mat.normalLineWidth);
+    }
 
+    private setOutline(outlineColor: Color, lineWidth: number) {
+        const renderers = [
+            ...this.getComponentsInChildren(MeshRenderer),
+            ...this.getComponentsInChildren(SkinnedMeshRenderer),
+        ];
+        renderers.forEach(renderer => {
+            const material = renderer.material;
+            if(!material) return;
+            material.setProperty("baseColor", outlineColor);
+            material.setProperty("lineWidth", lineWidth);
+        });
     }
 
     

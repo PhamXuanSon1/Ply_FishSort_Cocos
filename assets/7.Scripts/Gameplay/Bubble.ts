@@ -66,6 +66,7 @@ export class Bubble extends PoolMember {
             fish.eulerAngles = v3(0, 0, 0);
             fish.scale = v3(1, 1, 1);
             fish.active = true;
+            f.faceFront = room.frontTypes.includes(d);
             f.init();
             thing.init();
             thing.bubble = this;
