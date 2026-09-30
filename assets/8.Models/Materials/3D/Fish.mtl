@@ -96,7 +96,7 @@
       "roughness": 1,
       "metallic": 0.8,
       "specularIntensity": 1,
-      "expansion": 300,
+      "expansion": 100,
       "glowColor": {
         "__type__": "cc.Color",
         "r": 255,
