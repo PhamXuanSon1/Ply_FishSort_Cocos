@@ -1,0 +1,94 @@
+{
+  "ver": "2.3.14",
+  "importer": "gltf",
+  "imported": true,
+  "uuid": "e8f0e089-65f2-4cfb-8f58-11cf58cf8f33",
+  "files": [],
+  "subMetas": {
+    "bcca5": {
+      "importer": "gltf-mesh",
+      "uuid": "e8f0e089-65f2-4cfb-8f58-11cf58cf8f33@bcca5",
+      "displayName": "",
+      "id": "bcca5",
+      "name": "UnnamedMesh.mesh",
+      "userData": {
+        "gltfIndex": 0,
+        "triangleCount": 3154
+      },
+      "ver": "1.1.1",
+      "imported": true,
+      "files": [
+        ".bin",
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "438fe": {
+      "importer": "gltf-skeleton",
+      "uuid": "e8f0e089-65f2-4cfb-8f58-11cf58cf8f33@438fe",
+      "displayName": "",
+      "id": "438fe",
+      "name": "UnnamedSkeleton.skeleton",
+      "userData": {
+        "gltfIndex": 0,
+        "jointsLength": 21
+      },
+      "ver": "1.0.1",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "2b8e7": {
+      "importer": "gltf-scene",
+      "uuid": "e8f0e089-65f2-4cfb-8f58-11cf58cf8f33@2b8e7",
+      "displayName": "",
+      "id": "2b8e7",
+      "name": "SK_Fish34.prefab",
+      "userData": {
+        "gltfIndex": 0
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    }
+  },
+  "userData": {
+    "imageMetas": [],
+    "lods": {
+      "enable": false,
+      "hasBuiltinLOD": false,
+      "options": [
+        {
+          "screenRatio": 0.25,
+          "faceCount": 1
+        },
+        {
+          "screenRatio": 0.125,
+          "faceCount": 0.25
+        },
+        {
+          "screenRatio": 0.01,
+          "faceCount": 0.1
+        }
+      ]
+    },
+    "assetFinder": {
+      "meshes": [
+        "e8f0e089-65f2-4cfb-8f58-11cf58cf8f33@bcca5"
+      ],
+      "skeletons": [
+        "e8f0e089-65f2-4cfb-8f58-11cf58cf8f33@438fe"
+      ],
+      "textures": [],
+      "materials": [],
+      "scenes": [
+        "e8f0e089-65f2-4cfb-8f58-11cf58cf8f33@2b8e7"
+      ]
+    }
+  }
+}

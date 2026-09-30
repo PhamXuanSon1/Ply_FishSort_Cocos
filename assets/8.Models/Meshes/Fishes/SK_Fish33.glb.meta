@@ -1,0 +1,94 @@
+{
+  "ver": "2.3.14",
+  "importer": "gltf",
+  "imported": true,
+  "uuid": "10cd34e7-4ba8-4e3f-8372-44b72cce27aa",
+  "files": [],
+  "subMetas": {
+    "a2813": {
+      "importer": "gltf-mesh",
+      "uuid": "10cd34e7-4ba8-4e3f-8372-44b72cce27aa@a2813",
+      "displayName": "",
+      "id": "a2813",
+      "name": "Fish33.mesh",
+      "userData": {
+        "gltfIndex": 0,
+        "triangleCount": 2936
+      },
+      "ver": "1.1.1",
+      "imported": true,
+      "files": [
+        ".bin",
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "1d645": {
+      "importer": "gltf-skeleton",
+      "uuid": "10cd34e7-4ba8-4e3f-8372-44b72cce27aa@1d645",
+      "displayName": "",
+      "id": "1d645",
+      "name": "Fish33_Rig.skeleton",
+      "userData": {
+        "gltfIndex": 0,
+        "jointsLength": 20
+      },
+      "ver": "1.0.1",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "f691f": {
+      "importer": "gltf-scene",
+      "uuid": "10cd34e7-4ba8-4e3f-8372-44b72cce27aa@f691f",
+      "displayName": "",
+      "id": "f691f",
+      "name": "SK_Fish33.prefab",
+      "userData": {
+        "gltfIndex": 0
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    }
+  },
+  "userData": {
+    "imageMetas": [],
+    "lods": {
+      "enable": false,
+      "hasBuiltinLOD": false,
+      "options": [
+        {
+          "screenRatio": 0.25,
+          "faceCount": 1
+        },
+        {
+          "screenRatio": 0.125,
+          "faceCount": 0.25
+        },
+        {
+          "screenRatio": 0.01,
+          "faceCount": 0.1
+        }
+      ]
+    },
+    "assetFinder": {
+      "meshes": [
+        "10cd34e7-4ba8-4e3f-8372-44b72cce27aa@a2813"
+      ],
+      "skeletons": [
+        "10cd34e7-4ba8-4e3f-8372-44b72cce27aa@1d645"
+      ],
+      "textures": [],
+      "materials": [],
+      "scenes": [
+        "10cd34e7-4ba8-4e3f-8372-44b72cce27aa@f691f"
+      ]
+    }
+  }
+}
