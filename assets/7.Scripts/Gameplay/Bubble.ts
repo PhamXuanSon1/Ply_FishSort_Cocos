@@ -1,4 +1,4 @@
-import { _decorator, CircleCollider2D, Component, ERigidBody2DType, instantiate, Node, NodeSpace, ParticleSystem, RigidBody, RigidBody2D, tween, v2, v3, Vec3 } from 'cc';
+import { _decorator, CircleCollider2D, Component, ERigidBody2DType, EventTouch, instantiate, Node, NodeSpace, ParticleSystem, RigidBody, RigidBody2D, tween, v2, v3, Vec3 } from 'cc';
 import { Thing } from './Thing';
 import { room } from './Room';
 import { WaveSprite } from '../Misc/WaveSprite';
@@ -75,6 +75,15 @@ export class Bubble extends PoolMember {
             this.fishMove.init();
         }
         this.waveSprite = this.node.getComponentInChildren(WaveSprite);
+        // Handle the whole gesture locally; UI nodes can swallow global input events.
+        this.waveSprite.node.off(Node.EventType.TOUCH_START, this.onDragStart, this);
+        this.waveSprite.node.off(Node.EventType.TOUCH_MOVE, this.onDragMove, this);
+        this.waveSprite.node.off(Node.EventType.TOUCH_END, this.onDragEnd, this);
+        this.waveSprite.node.off(Node.EventType.TOUCH_CANCEL, this.onDragEnd, this);
+        this.waveSprite.node.on(Node.EventType.TOUCH_START, this.onDragStart, this);
+        this.waveSprite.node.on(Node.EventType.TOUCH_MOVE, this.onDragMove, this);
+        this.waveSprite.node.on(Node.EventType.TOUCH_END, this.onDragEnd, this);
+        this.waveSprite.node.on(Node.EventType.TOUCH_CANCEL, this.onDragEnd, this);
         this.collider = this.getComponent(CircleCollider2D);
         this.fitFishes();
         this.body = this.getComponent(RigidBody2D);
@@ -86,6 +95,18 @@ export class Bubble extends PoolMember {
         }
 
         // this.body.linearVelocity = v2(0, length * 10);
+    }
+
+    onDragStart(event: EventTouch) {
+        room.onTouchStart2(event);
+    }
+
+    onDragMove(event: EventTouch) {
+        room.onTouchMove2(event);
+    }
+
+    onDragEnd(event: EventTouch) {
+        room.onTouchEnd2(event);
     }
 
     // tỉ lệ bán kính bong bóng mà cá được phép chiếm (tính cả lúc bơi vòng / ngó nghiêng)

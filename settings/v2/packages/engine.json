@@ -204,7 +204,6 @@
           "audio",
           "base",
           "custom-pipeline",
-          "custom-pipeline-post-process",
           "gfx-webgl",
           "graphics",
           "light-probe",

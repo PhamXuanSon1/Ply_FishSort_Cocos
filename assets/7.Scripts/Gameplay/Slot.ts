@@ -161,6 +161,9 @@ export class Slot extends PoolMember {
             thing.box.onDespawnThing();
         }
         thing.box = this;
+        // bay lên slot: viền chọn (vàng); vào hộp chờ: viền thường
+        thing.toSlot = this.isSlot;
+        thing.setOutline(this.isSlot);
         this.thingType = thing.thingType;
         this.thing = thing;       
         if(!linear) {

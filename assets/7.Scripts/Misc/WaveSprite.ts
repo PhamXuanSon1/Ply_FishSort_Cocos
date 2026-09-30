@@ -52,9 +52,10 @@ export class WaveSprite extends Component {
             this.node.on(Node.EventType.TOUCH_START, this.onTouchStart, this);            
         }
         if(this.bindMove)  {
+            if(!this.bindTouch) this.node.on(Node.EventType.TOUCH_START, this.onDragStart, this);
             this.node.on(Node.EventType.TOUCH_MOVE, this.onTouchMove, this);    
-            this.node.on(Node.EventType.TOUCH_END 
-            || Node.EventType.TOUCH_CANCEL, this.onTouchEnd, this);     
+            this.node.on(Node.EventType.TOUCH_END, this.onTouchEnd, this);
+            this.node.on(Node.EventType.TOUCH_CANCEL, this.onTouchEnd, this);
         
         }
         for (let i = 0; i < RIPPLE_POINT_COUNT; i++) {
@@ -83,6 +84,7 @@ export class WaveSprite extends Component {
     @property([EventHandler])
     onTouchHandlers: EventHandler[] = [];
     onTouchStart(event: EventTouch) {
+        if(this.bindMove) this.onDragStart(event);
         this.onTouchHandlers[0] && this.onTouchHandlers[0].emit([event]);
         ipm.fisrtTap();
         let pos2 = event.getUILocation();
@@ -103,6 +105,10 @@ export class WaveSprite extends Component {
     }
 
     
+    onDragStart(event: EventTouch) {
+        room.onTouchStart2(event);
+    }
+
     onTouchMove(event: EventTouch) {
         room.onTouchMove2(event);
     }

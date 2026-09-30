@@ -119,6 +119,7 @@ export class Room extends Component {
     firstHandHintTween: Tween<any> = null;
     firstHandHintScheduled: boolean = false;
     firstHandHintShown: boolean = false;
+    private dragTouchId: number = null;
 
     @property({ type: Number, tooltip: 'Số giây chờ trước khi hiện hand hint.' })
     handHintDelay: number = 5;
@@ -148,6 +149,7 @@ export class Room extends Component {
     
     mat: Mats = null
     initMats() {
+        this.fish = this.node.getChildByName("Fish");
         this.mat = this.node.getChildByName("Material").getComponentInChildren(Mats);
         this.mat.init();
     }
@@ -753,12 +755,26 @@ export class Room extends Component {
     }
 
 
+    // Kéo để highlight, thả tay để chọn cá.
+    @property
+    dragCollect: boolean = true;
+    // hệ số vùng bắt khi kéo, nhân với nửa cạnh node Touch của cá
+    @property
+    dragHitScale: number = 1;
+
+    /** Khi đang kéo, chỉ highlight cá dưới ngón tay; thao tác chọn cá được xử lý khi thả. */
+    collectAt(pos: Vec2) {
+        if(this.dragTouchId === null || !this.dragCollect || !this.zoomed || this.lose || this.bound) return;
+        this.updateDragHighlight(pos);
+    }
+
     getNearestThing(pos: Vec2, multiplier: number = 1) {
         let pos3 = v3(pos.x, pos.y, 0);
         let dis = null;
         let neareast: Thing = null;
         for(let i = 0; i < this.things.length; i++) {
             let thing = this.things[i];
+            if(!thing.node?.isValid || !thing.touch?.isValid || thing.moving || thing.waiting) continue;
             let wpos = thing.touch.getWorldPosition();
             wpos.z = 0;
             let d = Vec3.distance(pos3, wpos);
@@ -773,6 +789,8 @@ export class Room extends Component {
             }
         }
 
+        if(!neareast?.touch) return null;
+
         let width = neareast.touch.getWorldScale().x * 
         neareast.touch.getComponent(UITransform).width;
 
@@ -784,39 +802,46 @@ export class Room extends Component {
     }
 
     onTouchStart2(event: EventTouch) {
-        let pos = event.getUILocation();
-        let neareast = this.getNearestThing(pos); 
-        if(this.things.includes(this.hThing)) this.hThing?.offHightlight();  
-        if(neareast) {
-            // neareast.onTouchStart(event);   
-        }       
+        if(!event || this.dragTouchId !== null) return;
+        this.clearDragHighlight();
+        this.dragTouchId = event.getID();
     }
 
     hThing: Thing = null;
     onTouchMove2(event: EventTouch) {
-        let pos = event.getUILocation();
-        let neareast = this.getNearestThing(pos, 1.5);  
-        if(this.things.includes(this.hThing)) this.hThing?.offHightlight();  
+        if(!event || this.dragTouchId === null || event.getID() !== this.dragTouchId) return;
+        this.collectAt(event.getUILocation());
+    }
+
+    updateDragHighlight(pos: Vec2) {
+        const neareast = this.getNearestThing(pos, 1.5);
+        if(neareast === this.hThing) return;
+        this.clearDragHighlight();
         if(neareast) {
             this.hThing = neareast;
-            neareast.onHightlight();   
-        } else {
-            this.hThing = null;
-        }  
-        
+            neareast.onHightlight();
+        }
     }
+
+    clearDragHighlight() {
+        if(this.hThing?.node?.isValid) this.hThing.offHightlight();
+        this.hThing = null;
+    }
+
     onTouchEnd2(event: EventTouch) {
-        // let pos = event.getUILocation();
-        // let neareast = this.getNearestThing(pos);   
-        // if(neareast) {
-        //     neareast.onHightlight();   
-        // }    
-        if(this.things.includes(this.hThing)) {
-            if(this.hThing) {
-                this.hThing.offHightlight();
-                this.hThing.onTouchStart(event);
-                this.hThing = null;
-            }
+        this.finishDragHighlight(event);
+    }
+
+    finishDragHighlight(event: EventTouch) {
+        if(!event || this.dragTouchId === null || event.getID() !== this.dragTouchId) return;
+        // Consume this gesture before picking: node and global handlers may both receive the release.
+        this.dragTouchId = null;
+        const selectedThing = this.hThing;
+        this.clearDragHighlight();
+        if(!this.dragCollect || !this.zoomed || this.lose || this.bound) return;
+        if(selectedThing?.node?.isValid && this.things.includes(selectedThing)
+            && !selectedThing.moving && !selectedThing.waiting) {
+            selectedThing.onTouchStart(event);
         }
     }
 
@@ -1445,6 +1470,7 @@ export class Room extends Component {
     click: boolean = false;
     onTouchStart(event: EventTouch) {
         if(!event) return;
+        this.onTouchStart2(event);
         // Any touch after the opening tutorial hides the hint and restarts the 5s idle timer.
         if(this.fisrtTapCount <= 0 && this.tappable && !this.lose) {
             ui.offHand();
@@ -1479,6 +1505,7 @@ export class Room extends Component {
 
         // return;
         if(!event) return;
+        if(event.getTouches().length < 2) this.onTouchMove2(event);
         
         
         let touches = event.getTouches();
@@ -1526,6 +1553,7 @@ export class Room extends Component {
 
     onTouchEnd(event: EventTouch) {
         if(!event) return;
+        this.finishDragHighlight(event);
         this.startPos = null;
         let out = event.getUILocation();
         if(this.s1 && this.s2) {

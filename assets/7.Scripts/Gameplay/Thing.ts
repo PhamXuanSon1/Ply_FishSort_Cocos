@@ -53,30 +53,46 @@ export class Thing extends PoolMember {
         // console.log(mesh);
         // let mat = room.mat.getClone(this.thingType);
         let mat = room.mat.mats[this.thingType];
-        mesh && !mesh.material && mesh.setSharedMaterial(mat, 0);
+        // sharedMaterial, không dùng mesh.material: getter đó tạo material instance riêng, đè lên viền theo trạng thái
+        mesh && !mesh.sharedMaterial && mesh.setSharedMaterial(mat, 0);
     }
 
 
+    // Keep move/end handlers until the node that owns the touch finishes its gesture.
     offTouch() {
         if(!this.node) return;
-        this.touch.off(Node.EventType.TOUCH_START, this.onTouchStart, this);
-        this.touch.off(Node.EventType.TOUCH_MOVE, this.none, this);
-        this.touch.off(Node.EventType.TOUCH_END, this.none, this);
-        this.touch.off(Node.EventType.TOUCH_CANCEL, this.none, this);
+        this.touch.off(Node.EventType.TOUCH_START, this.onDragStart, this);
         this.offHightlight();
     }
 
     onTouch() {
-        this.touch.on(Node.EventType.TOUCH_START, this.onTouchStart, this);
-        this.touch.on(Node.EventType.TOUCH_MOVE, this.none, this);
-        this.touch.on(Node.EventType.TOUCH_END, this.none, this);
-        this.touch.on(Node.EventType.TOUCH_CANCEL, this.none, this);
+        this.touch.off(Node.EventType.TOUCH_START, this.onDragStart, this);
+        this.touch.off(Node.EventType.TOUCH_MOVE, this.onTouchMove, this);
+        this.touch.off(Node.EventType.TOUCH_END, this.onDragEnd, this);
+        this.touch.off(Node.EventType.TOUCH_CANCEL, this.onDragEnd, this);
+        this.touch.on(Node.EventType.TOUCH_START, this.onDragStart, this);
+        this.touch.on(Node.EventType.TOUCH_MOVE, this.onTouchMove, this);
+        this.touch.on(Node.EventType.TOUCH_END, this.onDragEnd, this);
+        this.touch.on(Node.EventType.TOUCH_CANCEL, this.onDragEnd, this);
+    }
+
+    onDragStart(event: EventTouch) {
+        room.onTouchStart2(event);
+        if(room.dragCollect) {
+            room.onTouchMove2(event);
+            ipm.fisrtTap();
+        } else {
+            this.onTouchStart(event);
+        }
     }
 
     onTouchMove(event: EventTouch) {
+        room.onTouchMove2(event);
     }
 
-    none() {}
+    onDragEnd(event: EventTouch) {
+        room.onTouchEnd2(event);
+    }
 
     onDespawn() {
         let src = this.fish.node.children[0];
@@ -92,19 +108,23 @@ export class Thing extends PoolMember {
         ipm.fisrtTap();   
     }
 
+    // đã được chọn bay lên slot: giữ viền vàng, highlight / bỏ highlight không được đổi lại
+    toSlot: boolean = false;
+
+    /** Viền theo trạng thái: selected = viền chọn (Mats.selectMats: màu + độ dày select), còn lại viền thường (Mats.mats). */
+    setOutline(selected: boolean) {
+        let m = selected ? room.mat.selectMats[this.thingType] : room.mat.mats[this.thingType];
+        if(!m) return;
+        this.getComponentsInChildren(MeshRenderer).forEach(r => r.setSharedMaterial(m, 0));
+    }
+
+    // highlight khi kéo qua = viền chọn; dùng material chung, không tạo material instance
     onHightlight() {
-        let mesh = this.getComponentInChildren(MeshRenderer);
-        if(mesh) {
-            mesh.material.setProperty("lineWidth", 600000);
-        }
+        this.setOutline(true);
     }
 
     offHightlight() {
-        let mesh = this.getComponentInChildren(MeshRenderer);
-        if(mesh) {
-            mesh.material.setProperty("lineWidth", 0);
-        }
-
+        if(!this.toSlot) this.setOutline(false);
     }
 
     
