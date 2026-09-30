@@ -367,6 +367,7 @@
       "__id__": 17
     },
     "type": 3,
+    "fishFill": 1.2,
     "_id": ""
   },
   {
@@ -465,6 +466,7 @@
       "__id__": 0
     },
     "fileId": "1dir+HiKxLO4GJeSIGUcc6",
+    "instance": null,
     "targetOverrides": null
   }
 ]

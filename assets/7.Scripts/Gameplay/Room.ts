@@ -284,7 +284,7 @@ export class Room extends Component {
     initBubbles() {
         this.thingNode.destroyAllChildren();
         this.thingNode.removeAllChildren();
-        this.bubbles = BubbleData.map(([x, y, types]) => {
+        this.bubbles = Room.limitBubbleSize(BubbleData, this.maxFishPerBubble).map(([x, y, types]) => {
             let bubble = pm.spawnType<Bubble>(PoolType.Bubble);
             bubble.node.parent = this.thingNode;
             bubble.node.position = v3(x, y, 0);
@@ -292,6 +292,31 @@ export class Room extends Component {
             bubble.init(types);
             return bubble;
         });
+    }
+
+    // số cá tối đa trong 1 bong bóng - bong bóng nhiều hơn trong BubbleData được chia bớt lúc spawn
+    @property
+    maxFishPerBubble: number = 3;
+
+    /**
+     * Giới hạn mỗi bong bóng tối đa `max` con: cá dư chuyển sang bong bóng gần nhất còn chỗ (không có thì tạo
+     * bong bóng mới ngay dưới), rồi đổi chỗ để không bong bóng nào có 3 con cùng loại. Tổng cá mỗi loại giữ nguyên.
+     */
+    static limitBubbleSize(data: [number, number, number[]][], max: number): [number, number, number[]][] {
+        let out: [number, number, number[]][] = data.map(([x, y, types]) => [x, y, [...types]]);
+        if(!(max > 0)) return out;
+        let extra: [number, number, number][] = [];
+        out.forEach(([x, y, types]) => {
+            while(types.length > max) extra.push([x, y, types.pop()]);
+        });
+        extra.forEach(([x, y, type]) => {
+            let target = out.filter(d => d[2].length < max)
+                .sort((a, b) => Math.hypot(a[0] - x, a[1] - y) - Math.hypot(b[0] - x, b[1] - y))[0];
+            if(target) target[2].push(type);
+            else out.push([x, y - 300, [type]]);
+        });
+        Room.breakTriples(out.map(d => d[2]));
+        return out;
     }
 
     /** Sinh ngẫu nhiên 1 mảng đúng định dạng BubbleData ([x, y, types] mỗi phần tử) theo params: box là vùng

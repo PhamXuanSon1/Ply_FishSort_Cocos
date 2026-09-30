@@ -37,10 +37,7 @@ export class Bubble extends PoolMember {
         p.removeAllChildren();
         this.things = [];
 
-        const minScale = 1, maxScale = 2.2, maxLen = 20;
-        const t = Math.min((data.length - 1) / (maxLen - 1), 1);
-        let scale = minScale + (maxScale - minScale) * cEasing('circOut')(t);
-        scale *= 0.78;
+        let scale = Bubble.scaleFor(data.length);
         this.node.scale = v3(1, 1, 1).multiplyScalar(scale);
         
         this.fishMove = this.getComponent(FishMove);
@@ -95,38 +92,60 @@ export class Bubble extends PoolMember {
     @property
     fishFill: number = 0.95;
 
+    /** Scale bong bóng theo số cá bên trong. */
+    static scaleFor(n: number) {
+        const minScale = 1, maxScale = 2.2, maxLen = 20;
+        const t = Math.min((n - 1) / (maxLen - 1), 1);
+        return (minScale + (maxScale - minScale) * cEasing('circOut')(t)) * 0.78;
+    }
+
+    // hệ số cỡ cá dùng chung cho mọi bong bóng (cache theo danh sách loại cá đang chơi)
+    static fishK = { key: '', k: 1 };
+    // bán kính mesh (local SK_FishN) quanh gốc - tâm xoay của cá, theo loại
+    static fishReach: Map<number, number> = new Map();
+
     /**
-     * Cỡ cá cố định còn bong bóng to/nhỏ theo số cá, nên bong bóng ít cá bị cá lòi ra ngoài. Tính khoảng cách xa
-     * nhất cá có thể tới (vị trí trên vòng bơi + drift ngó nghiêng/nhấp nhô + bán kính mesh quanh tâm xoay, không
-     * phụ thuộc hướng xoay) rồi thu nhỏ Thing (quanh tâm bong bóng) cho vừa fishFill bán kính bong bóng.
+     * Cỡ cá cố định còn bong bóng to/nhỏ theo số cá, nên bong bóng ít cá dễ bị cá lòi ra ngoài. Tính 1 hệ số
+     * chung cho mọi bong bóng (1..room.maxFishPerBubble cá, mọi loại đang chơi) theo trường hợp chật nhất: vị trí trên vòng bơi +
+     * drift ngó nghiêng/nhấp nhô + bán kính mesh quanh tâm xoay (không phụ thuộc hướng xoay) <= fishFill bán kính
+     * bong bóng. Mọi bong bóng dùng cùng hệ số nên cá trong bong bóng đơn cũng cùng cỡ với bong bóng nhiều cá.
      */
     fitFishes() {
-        let R = this.collider.radius * this.node.worldScale.x * this.fishFill;
-        let need = 0;
-        let p = v3();
-        this.things.forEach(t => {
-            t.node.scale = v3(1, 1, 1).multiplyScalar(1 / this.node.scale.x);
-            let fishNode = t.getComponentInChildren(Fish)?.node;
-            let src = fishNode?.children[0];
-            let pts = room.getFishPoints(t.thingType);
-            if(!src || !pts) return;
-            let ws = t.node.worldScale.x;
-            let m = src.worldMatrix;
-            let pivot = fishNode.worldPosition;
-            let e = 0;
-            for(let i = 0; i < pts.length; i += 9) {
-                p.set(pts[i], pts[i + 1], pts[i + 2]);
-                Vec3.transformMat4(p, p, m);
-                e = Math.max(e, Vec3.distance(p, pivot));
-            }
+        let t0 = this.things[0];
+        let src = t0?.getComponentInChildren(Fish)?.node.children[0];
+        if(!src) return;
+        this.things.forEach(t => t.node.scale = v3(1, 1, 1).multiplyScalar(1 / this.node.scale.x));
+
+        let types = room.fishTypes.filter(t => room.getFishPoints(t));
+        let key = types.join(',') + '|' + room.maxFishPerBubble;
+        if(Bubble.fishK.key != key) {
+            let ws = t0.node.worldScale.x;
+            let srcWS = src.worldScale.x;
+            let parentWS = this.node.parent.worldScale.x;
             let fm = this.fishMove;
-            let orbit = fm && this.things.length > 1 ? fm.radius : 0;
             let drift = fm ? Math.SQRT2 * fm.idleAmplitude + fm.bobAmplitude : 0;
-            need = Math.max(need, (orbit + drift) * ws + e);
-        });
-        if(need <= R) return;
-        let k = R / need;
-        this.things.forEach(t => t.node.scale = t.node.scale.clone().multiplyScalar(k));
+            let k = 1;
+            for(let n = 1; n <= Math.max(1, room.maxFishPerBubble); n++) {
+                let R = this.collider.radius * parentWS * Bubble.scaleFor(n) * this.fishFill;
+                let orbit = fm && n > 1 ? fm.radius : 0;
+                types.forEach(type => {
+                    let need = (orbit + drift) * ws + Bubble.reachOf(type) * srcWS;
+                    if(need > 0) k = Math.min(k, R / need);
+                });
+            }
+            Bubble.fishK = { key, k };
+        }
+        let k = Bubble.fishK.k;
+        if(k < 1) this.things.forEach(t => t.node.scale = t.node.scale.clone().multiplyScalar(k));
+    }
+
+    static reachOf(type: number) {
+        if(Bubble.fishReach.has(type)) return Bubble.fishReach.get(type);
+        let pts = room.getFishPoints(type);
+        let r = 0;
+        for(let i = 0; pts && i < pts.length; i += 3) r = Math.max(r, Math.hypot(pts[i], pts[i + 1], pts[i + 2]));
+        Bubble.fishReach.set(type, r);
+        return r;
     }
 
     /** Đảo ngược init(): trả về đúng 1 phần tử của Room.BubbleData ([x, y, types]) theo vị trí + loại cá hiện tại. */
