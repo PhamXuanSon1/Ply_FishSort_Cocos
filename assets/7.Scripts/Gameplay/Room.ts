@@ -109,7 +109,10 @@ export class Room extends Component {
     maxMoveX: number = 400;
     maxMoveY: number = 200;
     hintTween: Tween<any> = null;
-    fisrtTapCount: number = 1;
+
+    // khai báo firstTapCount để xác định số lần chạm đầu tiên mà người chơi cần thực hiện trước khi trò chơi bắt đầu.
+    @property({ type: Number })
+    fisrtTapCount: number = 3;
 
     items: number[][] = [];
 
@@ -845,12 +848,11 @@ export class Room extends Component {
 
         try {
             if(!EDITOR_NOT_IN_PREVIEW) {
-                // Tutorial: point once at the fish nearest the middle of the field whose type
-                // already has a slot, so the first tap always sorts instead of filling a box.
-                let center = this.thingNode.worldPosition;
-                let things = this.things.filter(t => this.slots.some(s => s.thingType == t.thingType));
-                things.sort((a, b) => Vec3.squaredDistance(a.node.worldPosition, center) - Vec3.squaredDistance(b.node.worldPosition, center));
-                this.taps = things.slice(0, 1).map(t => t.node);
+                // Tutorial: chỉ vào 3 con cao nhất của loại cá ở slot đầu
+                let t0 = this.slots[0].thingType;
+                let things = this.things.filter(t => t.thingType == t0);
+                things.sort((a, b) => b.node.worldPosition.y - a.node.worldPosition.y);
+                this.taps = things.map(t => t.node).slice(0, 3);
             }
             // .reverse();
             
