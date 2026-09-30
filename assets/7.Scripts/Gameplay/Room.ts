@@ -1,4 +1,4 @@
-import { _decorator, Animation, CCObjectFlags, Component, EventKeyboard, EventTouch, Input, input, instantiate, JsonAsset, KeyCode, MeshRenderer, misc, Node, PhysicsSystem, PhysicsSystem2D, Scene, Sprite, Tween, tween, UITransform, v2, v3, Vec2, Vec3 } from 'cc';
+import { _decorator, Animation, CCObjectFlags, Component, EventKeyboard, EventTouch, gfx, Input, input, instantiate, JsonAsset, KeyCode, Mat4, Mesh, MeshRenderer, misc, Node, PhysicsSystem, PhysicsSystem2D, Scene, SkinnedMeshRenderer, Sprite, Tween, tween, UITransform, v2, v3, Vec2, Vec3 } from 'cc';
 import { Thing } from './Thing';
 import { Slot } from './Slot';
 import { ipm } from '../Manager/InputManager';
@@ -30,7 +30,7 @@ export var room: Room = null;
  */
 export const BubbleData: 
 [number, number, number[]][] = 
-[[132.428,1268.46,[0,26]],[-621.029,874.37,[27,0,23]],[620.997,1242.781,[20,20,27]],[-331.329,1268.474,[27,30]],[311.746,840.762,[28,20]],[710.886,827.523,[27]],[710.774,492.52,[20]],[-147.621,672.359,[29,23,0]],[245.951,381.656,[29,20]],[-226.381,189.451,[29,0]],[620.976,67.396,[27,20,26]],[-646.47,385.848,[28,28]],[125.572,0.849,[26]],[-646.417,-77.964,[26,29]],[-181.644,-297.852,[20,20,23]],[-620.956,-566.574,[30,30,0]],[342.884,-253.975,[30]],[101.306,-697.127,[28,20]],[-602.293,-1099.642,[0,30,29,0]],[-56.128,-1180.229,[26,30,0,23]],[602.341,-613.586,[28,29,28,0]],[495.364,-1155.148,[27,23,26,23]]]
+[[132.428,1268.46,[29,23]],[-621.029,874.37,[32,29,29]],[620.997,1242.781,[36,33,29]],[-331.329,1268.474,[36,23]],[311.746,840.762,[33,33]],[710.886,827.523,[32]],[710.774,492.52,[26]],[-147.621,672.359,[33,23,26]],[245.951,381.656,[29,34]],[-226.381,189.451,[27,36]],[620.976,67.396,[29,32,23]],[-646.47,385.848,[32,26]],[125.572,0.849,[27]],[-646.417,-77.964,[23,27]],[-181.644,-297.852,[34,23,26]],[-620.956,-566.574,[23,26,26]],[342.884,-253.975,[26]],[101.306,-697.127,[33,34]],[-602.293,-1099.642,[32,27,23,36]],[-56.128,-1180.229,[34,26,34,27]],[602.341,-613.586,[33,23,36,36]],[495.364,-1155.148,[26,34,32,27]]]
 
 /**
  * Thứ tự hộp ra slot, tính từ BubbleData (không hard code): mỗi loại cá n con -> n/3 nhóm [t, t, t].
@@ -203,8 +203,6 @@ export class Room extends Component {
                 [1, 2],
             ]
 
-            let totalBox = 0;
-
             // chỉ loại có model trong Room > Fish, loại thiếu model sẽ thành cá vô hình (bong bóng trống)
             let available = this.fishTypes.filter(t => this.fish.children[t]?.children.length > 0);
             if(available.length == 0) return;
@@ -212,18 +210,17 @@ export class Room extends Component {
 
             let types = Ulis.shuffleArray(available).slice(0, maxType);
 
+            // dt: [số cá trong 1 bong bóng, số bong bóng]
             let typeAmount = [];
-
-
-            dt.forEach(([type, amount]) => {
-                typeAmount.push(...Array(amount).fill(type));
-                totalBox += amount;
+            dt.forEach(([size, amount]) => {
+                typeAmount.push(...Array(amount).fill(size));
             })
-
             typeAmount = Ulis.shuffleArray(typeAmount);
 
+            // số nhóm theo đúng số chỗ trong bong bóng - mọi nhóm đẩy vào items đều có đủ 3 con được spawn
+            let totalFish = typeAmount.reduce((a, b) => a + b, 0);
+            let totalBox = Math.floor(totalFish / 3);
             let fishes = [];
-            
             for (let i = 0; i < totalBox; i++) {
                 let type = types[i % types.length];
                 let f = Array(3).fill(type);
@@ -233,11 +230,14 @@ export class Room extends Component {
             fishes = Ulis.shuffleArray(fishes);
 
             let cursor = 0;
-            const data: any[] = typeAmount.map((size, i) => {
-                let types = fishes.slice(cursor, cursor + size);
+            let groups: number[][] = typeAmount.map(size => {
+                let g = fishes.slice(cursor, cursor + size);
                 cursor += size;
-                return [0, -5000 - i * 500, types];
-            });
+                return g;
+            }).filter(g => g.length > 0);
+            Room.breakTriples(groups);
+
+            const data: any[] = groups.map((types, i) => [0, -5000 - i * 500, types]);
 
             // console.log(typeAmount, fishes, data);
             
@@ -252,6 +252,31 @@ export class Room extends Component {
 
                 this.things.push(...bubble.things);
             })
+        }
+    }
+
+    /** Đổi chỗ cá giữa các bong bóng để không bong bóng nào có từ 3 con cùng loại (3 con 1 chỗ = gom quá dễ). */
+    static breakTriples(groups: number[][]) {
+        let count = (g: number[], t: number) => g.filter(x => x == t).length;
+        for(let gi = 0; gi < groups.length; gi++) {
+            let g = groups[gi];
+            for(let i = 0; i < g.length; i++) {
+                let t = g[i];
+                if(count(g, t) < 3) continue;
+                // tìm con khác loại ở bong bóng khác mà đổi xong cả 2 bên đều < 3 con cùng loại
+                let done = false;
+                for(let oi = 0; oi < groups.length && !done; oi++) {
+                    let o = groups[oi];
+                    if(o == g) continue;
+                    for(let j = 0; j < o.length && !done; j++) {
+                        let u = o[j];
+                        if(u == t || count(o, t) >= 2 || count(g, u) >= 2) continue;
+                        g[i] = u;
+                        o[j] = t;
+                        done = true;
+                    }
+                }
+            }
         }
     }
 
@@ -832,13 +857,132 @@ export class Room extends Component {
             fish._objFlags = CCObjectFlags.DontSave;
             f.init();
             f.setAnim(false);
-            
+
             tt.init(false);
+            this.fitInTank(slot, fish, key);
 
         }
         // console.log("items length", this.items.length);
-        
+
         return array != undefined;
+    }
+
+    // tỉ lệ cạnh lớn nhất của cá trong slot so với content size FishTank (chừa chỗ cho cá uốn thân)
+    @property
+    tankFill: number = 0.8;
+    fishPoints: Map<number, Float32Array> = new Map();
+
+    /**
+     * Scale đều + dời cá (bản clone SK_FishN trong Avatar của slot) để cạnh lớn nhất bằng tankFill khung FishTank
+     * và tâm mesh trùng tâm FishTank. Camera UI orthographic nên chỉ so trên mặt phẳng XY (world).
+     */
+    fitInTank(slot: Slot, fish: Node, type: number) {
+        let tank: Node = null;
+        Ulis.allNode(slot.node, n => { if(!tank && /^FishTank/i.test(n.name)) tank = n; });
+        let ut = tank?.getComponent(UITransform);
+        let pts = this.getFishPoints(type);
+        if(!ut || !pts || pts.length == 0) return;
+
+        // AABB world của cá: chiếu từng đỉnh (local SK_FishN) qua worldMatrix của clone - hộp 8 góc bị phình khi cá xoay
+        let m = fish.worldMatrix;
+        let min = v3(Infinity, Infinity, Infinity), max = v3(-Infinity, -Infinity, -Infinity), p = v3();
+        for(let i = 0; i < pts.length; i += 3) {
+            p.set(pts[i], pts[i + 1], pts[i + 2]);
+            Vec3.transformMat4(p, p, m);
+            Vec3.min(min, min, p);
+            Vec3.max(max, max, p);
+        }
+        let w = max.x - min.x, h = max.y - min.y;
+        if(!(w > 0 && h > 0)) return;
+
+        let rect = ut.getBoundingBoxToWorld();
+        let k = this.tankFill * Math.min(rect.width / w, rect.height / h);
+        // scale quanh gốc clone O: tâm c -> O + k (c - O), rồi dời để tâm về giữa FishTank
+        let o = fish.worldPosition.clone();
+        let c = v3((min.x + max.x) / 2, (min.y + max.y) / 2, (min.z + max.z) / 2);
+        let cNew = Vec3.scaleAndAdd(v3(), o, Vec3.subtract(v3(), c, o), k);
+        fish.setScale(k, k, k);
+        fish.setWorldPosition(o.x + rect.center.x - cNew.x, o.y + rect.center.y - cNew.y, o.z);
+    }
+
+    /** Đỉnh mesh (đã skinning) của cá mẫu room.fish.children[type] trong local space của node SK_FishN, cache theo loại. */
+    getFishPoints(type: number) {
+        if(this.fishPoints.has(type)) return this.fishPoints.get(type);
+        let sk = this.fish.children[type];
+        let renderer = sk?.getComponentInChildren(SkinnedMeshRenderer) || sk?.getComponentInChildren(MeshRenderer);
+        let pts = renderer?.mesh ? Room.meshPoints(renderer, Mat4.invert(new Mat4(), sk.worldMatrix)) : null;
+        this.fishPoints.set(type, pts);
+        return pts;
+    }
+
+    /**
+     * a_position dạng float. GLB nén (KHR_mesh_quantization) lưu số nguyên 0..65535 -> readAttribute trả số thô;
+     * giải nén tuyến tính từng trục về [minPosition, maxPosition] của mesh.
+     */
+    static readPositions(mesh: Mesh): ArrayLike<number> {
+        let pos = mesh.readAttribute(0, gfx.AttributeName.ATTR_POSITION);
+        if(!pos) return [];
+        let s = mesh.struct;
+        let bundle = s.vertexBundles[s.primitives[0].vertexBundelIndices[0]];
+        let attr = bundle?.attributes.find(a => a.name == gfx.AttributeName.ATTR_POSITION);
+        if(!attr || attr.format == 32 /* gfx.Format.RGB32F */ || !s.minPosition || !s.maxPosition) return pos;
+        let lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+        for(let i = 0; i < pos.length; i++) {
+            let j = i % 3;
+            lo[j] = Math.min(lo[j], pos[i]);
+            hi[j] = Math.max(hi[j], pos[i]);
+        }
+        let min = [s.minPosition.x, s.minPosition.y, s.minPosition.z];
+        let max = [s.maxPosition.x, s.maxPosition.y, s.maxPosition.z];
+        let out = new Float32Array(pos.length);
+        for(let i = 0; i < pos.length; i++) {
+            let j = i % 3;
+            out[i] = hi[j] > lo[j] ? min[j] + (pos[i] - lo[j]) / (hi[j] - lo[j]) * (max[j] - min[j]) : (min[j] + max[j]) / 2;
+        }
+        return out;
+    }
+
+    /** Đỉnh mesh sau skinning (CPU) theo pose hiện tại, mỗi đỉnh world nhân thêm ma trận `inv`. */
+    static meshPoints(renderer: MeshRenderer, inv: Mat4): Float32Array {
+        let mesh = renderer.mesh;
+        let pos = Room.readPositions(mesh);
+        let out = new Float32Array(pos.length);
+        let n = 0;
+        let v = v3(), acc = v3(), t = v3();
+        let push = (p: Vec3) => {
+            Vec3.transformMat4(p, p, inv);
+            out[n++] = p.x; out[n++] = p.y; out[n++] = p.z;
+        };
+        let skel = renderer instanceof SkinnedMeshRenderer ? renderer.skeleton : null;
+        if(skel) {
+            let root = (renderer as SkinnedMeshRenderer).skinningRoot || renderer.node;
+            let jts = mesh.readAttribute(0, gfx.AttributeName.ATTR_JOINTS);
+            let wts = mesh.readAttribute(0, gfx.AttributeName.ATTR_WEIGHTS);
+            let jm = skel.joints.map((path, i) => {
+                let n = root.getChildByPath(path);
+                let mat = new Mat4();
+                if(n) Mat4.multiply(mat, n.worldMatrix, skel.bindposes[i]);
+                return mat;
+            });
+            for(let i = 0; i < pos.length / 3; i++) {
+                v.set(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]);
+                acc.set(0, 0, 0);
+                for(let k = 0; k < 4; k++) {
+                    let w = wts[i * 4 + k];
+                    if(!w) continue;
+                    Vec3.transformMat4(t, v, jm[jts[i * 4 + k]]);
+                    Vec3.scaleAndAdd(acc, acc, t, w);
+                }
+                push(acc);
+            }
+        } else {
+            for(let i = 0; i < pos.length / 3; i++) {
+                v.set(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]);
+                Vec3.transformMat4(t, v, renderer.node.worldMatrix);
+                push(t);
+            }
+        }
+        return out;
     }
 
     initThings() {

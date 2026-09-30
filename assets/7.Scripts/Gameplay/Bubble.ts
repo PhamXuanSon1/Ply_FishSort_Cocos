@@ -79,6 +79,7 @@ export class Bubble extends PoolMember {
         }
         this.waveSprite = this.node.getComponentInChildren(WaveSprite);
         this.collider = this.getComponent(CircleCollider2D);
+        this.fitFishes();
         this.body = this.getComponent(RigidBody2D);
 
         if(this.collider.sensor) {
@@ -88,6 +89,44 @@ export class Bubble extends PoolMember {
         }
 
         // this.body.linearVelocity = v2(0, length * 10);
+    }
+
+    // tỉ lệ bán kính bong bóng mà cá được phép chiếm (tính cả lúc bơi vòng / ngó nghiêng)
+    @property
+    fishFill: number = 0.95;
+
+    /**
+     * Cỡ cá cố định còn bong bóng to/nhỏ theo số cá, nên bong bóng ít cá bị cá lòi ra ngoài. Tính khoảng cách xa
+     * nhất cá có thể tới (vị trí trên vòng bơi + drift ngó nghiêng/nhấp nhô + bán kính mesh quanh tâm xoay, không
+     * phụ thuộc hướng xoay) rồi thu nhỏ Thing (quanh tâm bong bóng) cho vừa fishFill bán kính bong bóng.
+     */
+    fitFishes() {
+        let R = this.collider.radius * this.node.worldScale.x * this.fishFill;
+        let need = 0;
+        let p = v3();
+        this.things.forEach(t => {
+            t.node.scale = v3(1, 1, 1).multiplyScalar(1 / this.node.scale.x);
+            let fishNode = t.getComponentInChildren(Fish)?.node;
+            let src = fishNode?.children[0];
+            let pts = room.getFishPoints(t.thingType);
+            if(!src || !pts) return;
+            let ws = t.node.worldScale.x;
+            let m = src.worldMatrix;
+            let pivot = fishNode.worldPosition;
+            let e = 0;
+            for(let i = 0; i < pts.length; i += 9) {
+                p.set(pts[i], pts[i + 1], pts[i + 2]);
+                Vec3.transformMat4(p, p, m);
+                e = Math.max(e, Vec3.distance(p, pivot));
+            }
+            let fm = this.fishMove;
+            let orbit = fm && this.things.length > 1 ? fm.radius : 0;
+            let drift = fm ? Math.SQRT2 * fm.idleAmplitude + fm.bobAmplitude : 0;
+            need = Math.max(need, (orbit + drift) * ws + e);
+        });
+        if(need <= R) return;
+        let k = R / need;
+        this.things.forEach(t => t.node.scale = t.node.scale.clone().multiplyScalar(k));
     }
 
     /** Đảo ngược init(): trả về đúng 1 phần tử của Room.BubbleData ([x, y, types]) theo vị trí + loại cá hiện tại. */
