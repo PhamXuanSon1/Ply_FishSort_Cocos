@@ -4,7 +4,7 @@
  *   Editor.Message.request('scene', 'execute-scene-script', { name: 'fishdom-importer', method, args })
  * Chỉ ĐỌC scene (liệt kê slot, đo mesh); mọi thay đổi đều đi qua message 'scene' ở main.js để có undo + lưu đúng.
  */
-const { director, Node, MeshRenderer, SkinnedMeshRenderer, Mat4, Vec3 } = require('cc');
+const { director, Node, MeshRenderer, SkinnedMeshRenderer, UITransform, Mat4, Vec3 } = require('cc');
 
 /** Renderer của model: ưu tiên SkinnedMeshRenderer (cá có xương), không có thì MeshRenderer (model tĩnh). */
 function findRenderer(node) {
@@ -44,12 +44,44 @@ function findMats() {
 
 /** Bounds mesh sau skinning (CPU) trong local space của `space`; model tĩnh thì theo worldMatrix của node mesh. */
 function skinnedBounds(renderer, space) {
+    const inv = new Mat4();
+    Mat4.invert(inv, space.worldMatrix);
+    return meshBounds(renderer, inv);
+}
+
+/**
+ * a_position dạng float. GLB xuất có nén (KHR_mesh_quantization, vd Blender) lưu số nguyên 0..65535 -> readAttribute
+ * trả số thô; giải nén tuyến tính từng trục về [minPosition, maxPosition] của mesh (giá trị thật).
+ */
+function readPositions(mesh) {
+    const pos = mesh.readAttribute(0, 'a_position');
+    const s = mesh.struct;
+    const bundle = s.vertexBundles[s.primitives[0].vertexBundelIndices[0]];
+    const attr = bundle && bundle.attributes.find((a) => a.name === 'a_position');
+    if (!attr || attr.format === 32 /* gfx.Format.RGB32F */ || !s.minPosition || !s.maxPosition) return pos;
+    const lo = [Infinity, Infinity, Infinity];
+    const hi = [-Infinity, -Infinity, -Infinity];
+    for (let i = 0; i < pos.length; i++) {
+        const j = i % 3;
+        if (pos[i] < lo[j]) lo[j] = pos[i];
+        if (pos[i] > hi[j]) hi[j] = pos[i];
+    }
+    const min = [s.minPosition.x, s.minPosition.y, s.minPosition.z];
+    const max = [s.maxPosition.x, s.maxPosition.y, s.maxPosition.z];
+    const out = new Float32Array(pos.length);
+    for (let i = 0; i < pos.length; i++) {
+        const j = i % 3;
+        out[i] = hi[j] > lo[j] ? min[j] + (pos[i] - lo[j]) / (hi[j] - lo[j]) * (max[j] - min[j]) : (min[j] + max[j]) / 2;
+    }
+    return out;
+}
+
+/** Bounds mesh sau skinning (CPU), mỗi đỉnh (world) nhân thêm ma trận `inv`. */
+function meshBounds(renderer, inv) {
     const skel = renderer.skeleton;
     const root = renderer.skinningRoot || renderer.node;
     const mesh = renderer.mesh;
-    const pos = mesh.readAttribute(0, 'a_position');
-    const inv = new Mat4();
-    Mat4.invert(inv, space.worldMatrix);
+    const pos = readPositions(mesh);
     const min = [Infinity, Infinity, Infinity];
     const max = [-Infinity, -Infinity, -Infinity];
     const v = new Vec3(), acc = new Vec3(), t = new Vec3();
@@ -225,6 +257,75 @@ exports.methods = {
         const data = room.randomFromAvailableBubbles(types);
         const r3 = (v) => Math.round(v * 1000) / 1000;
         return data.map(([x, y, t]) => [r3(x), r3(y), t]);
+    },
+
+    /**
+     * Tính position + scale mới cho RootNode của cá mẫu (Room > Fish > SK_FishN) để khi đặt vào Avatar của slot
+     * trên thanh (BarSlot > slot0 > Avatar > ... > FishAnim) mesh nằm gọn trong content size của FishTank:
+     * scale đều để cạnh lớn nhất = `fill` (0..1) khung FishTank, rồi dời tâm mesh về tâm FishTank.
+     * Camera UI là orthographic nên chỉ so trên mặt phẳng XY (world). Không đổi gì - main.js set-property.
+     */
+    fitInTank(types, fill) {
+        const root = findFishRoot();
+        let room = null;
+        walk(director.getScene(), (n) => {
+            if (!room) room = n.components.find((c) => c.constructor && c.constructor.name === 'Room') || null;
+        });
+        if (!root || !room || !room.slotNode) throw new Error('Không thấy Room / Fish / slotNode trong scene');
+        const slot = room.slotNode.children[0];
+        let tank = null;
+        walk(slot, (n) => { if (!tank && /^FishTank/i.test(n.name)) tank = n; });
+        const ut = tank && tank.getComponent(UITransform);
+        if (!ut) throw new Error('Không thấy node FishTank (UITransform) trong ' + slot.name);
+        const avatar = slot.getChildByName('Avatar');
+        let anim = null;
+        if (avatar) walk(avatar, (n) => { if (!anim && n.components.some((c) => c.constructor && c.constructor.name === 'Fish')) anim = n; });
+        if (!anim) throw new Error('Không thấy node chứa Fish (FishAnim) trong ' + slot.name + '/Avatar');
+
+        const rect = ut.getBoundingBoxToWorld();
+        const animWorld = anim.worldMatrix;
+        const animInv = new Mat4();
+        Mat4.invert(animInv, animWorld);
+        const result = [];
+        for (const t of types) {
+            const sk = root.children[t];
+            const rn = sk && sk.children[0];
+            const renderer = sk && findRenderer(sk);
+            if (!rn || !renderer || !renderer.mesh) continue;
+            // đỉnh world của cá mẫu -> local SK_FishN -> world khi SK_FishN nằm trong FishAnim (position/rotation/scale = 0/0/1)
+            const skInv = new Mat4();
+            Mat4.invert(skInv, sk.worldMatrix);
+            const toAvatar = new Mat4();
+            Mat4.multiply(toAvatar, animWorld, skInv);
+            const b = meshBounds(renderer, toAvatar);
+            if (!(b.size[0] > 0 && b.size[1] > 0)) continue;
+            const k = fill * Math.min(rect.width / b.size[0], rect.height / b.size[1]);
+
+            // scale đều quanh gốc RootNode: điểm p (local SK) -> P + k (p - P)
+            const P = rn.position.clone();
+            const c = new Vec3(b.center[0], b.center[1], b.center[2]);
+            Vec3.transformMat4(c, c, animInv);
+            const scaled = new Vec3();
+            Vec3.subtract(scaled, c, P);
+            Vec3.multiplyScalar(scaled, scaled, k);
+            const cNew = new Vec3();
+            Vec3.add(cNew, P, scaled);
+            const cWorld = new Vec3();
+            Vec3.transformMat4(cWorld, cNew, animWorld);
+            const target = new Vec3(rect.x + rect.width / 2, rect.y + rect.height / 2, cWorld.z);
+            Vec3.transformMat4(target, target, animInv);
+            const pos = new Vec3();
+            Vec3.subtract(pos, target, scaled);
+            result.push({
+                type: t,
+                uuid: rn.uuid,
+                k,
+                position: [pos.x, pos.y, pos.z],
+                scale: [rn.scale.x * k, rn.scale.y * k, rn.scale.z * k],
+                size: [b.size[0] * k, b.size[1] * k],
+            });
+        }
+        return { tank: [rect.width, rect.height], slot: slot.name, fish: result };
     },
 
     /** Con đầu tiên của slot (model cá đã đặt), để "sửa slot" không cần import lại. */

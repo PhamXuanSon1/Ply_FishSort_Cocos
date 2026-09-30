@@ -21,6 +21,7 @@ exports.$ = {
     grid: '#grid',
     selection: '#selection',
     regen: '#regen',
+    fitTank: '#fitTank',
     clearUnused: '#clearUnused',
     save: '#save',
     blender: '#blender',
@@ -61,6 +62,7 @@ exports.methods = {
             blender: this.$.blender.value.trim(),
             unityRoot: this.$.unityRoot.value.trim(),
             regen: !!this.$.regen.value,
+            fitTank: !!this.$.fitTank.value,
             clearUnused: !!this.$.clearUnused.value,
             save: !!this.$.save.value,
         });
@@ -187,6 +189,7 @@ exports.methods = {
             selected,
             unityRoot: this.$.unityRoot.value.trim(),
             regen: !!this.$.regen.value,
+            fitTank: !!this.$.fitTank.value,
             clearUnused: !!this.$.clearUnused.value,
             save: !!this.$.save.value,
         }).catch((e) => ({ ok: false, log: ['LỖI: ' + e.message] }));
@@ -204,6 +207,7 @@ exports.ready = async function () {
     this.$.blender.value = prefs.blender || importerPrefs.blender || '';
     this.$.unityRoot.value = prefs.unityRoot !== undefined ? prefs.unityRoot : 'F:\\AssetFish\\FishSort-new-item';
     this.$.regen.value = prefs.regen !== undefined ? prefs.regen : true;
+    this.$.fitTank.value = prefs.fitTank !== undefined ? prefs.fitTank : true;
     this.$.clearUnused.value = prefs.clearUnused !== undefined ? prefs.clearUnused : true;
     this.$.save.value = prefs.save !== undefined ? prefs.save : true;
     if (!this.$.blender.value) this.$.blender.value = await Editor.Message.request(PKG, 'detect-blender').catch(() => '');
@@ -213,7 +217,7 @@ exports.ready = async function () {
     this.$.selNone.addEventListener('confirm', this.onSelNone.bind(this));
     this.$.apply.addEventListener('confirm', this.onApply.bind(this));
     this.$.grid.addEventListener('click', this.onGridClick.bind(this));
-    for (const k of ['regen', 'clearUnused', 'save', 'blender']) this.$[k].addEventListener('change', this.persist.bind(this));
+    for (const k of ['regen', 'fitTank', 'clearUnused', 'save', 'blender']) this.$[k].addEventListener('change', this.persist.bind(this));
     this.$.unityRoot.addEventListener('change', () => { this.persist(); this.load(); });
 
     await this.load();

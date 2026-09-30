@@ -28,6 +28,12 @@
         <div class="hint indent">Giữ vị trí + cỡ các bubble đang có trong scene, chia lại loại cá thành nhóm 3 xoay vòng theo danh sách chọn;
             BubbleData + Items trong Room.ts được thay bằng kết quả mới.</div>
         <ui-prop>
+            <ui-label slot="label" value="Canh cá vừa FishTank"></ui-label>
+            <ui-checkbox slot="content" id="fitTank" value="true"></ui-checkbox>
+        </ui-prop>
+        <div class="hint indent">Scale + dời RootNode của cá mẫu (Room &gt; Fish &gt; SK_FishN) để cá trong Avatar của slot nằm gọn
+            trong content size FishTank (cạnh lớn nhất 80%). Cá trong bubble dùng chung RootNode nên cũng đổi theo.</div>
+        <ui-prop>
             <ui-label slot="label" value="Dọn model ở slot không chọn"></ui-label>
             <ui-checkbox slot="content" id="clearUnused" value="true"></ui-checkbox>
         </ui-prop>

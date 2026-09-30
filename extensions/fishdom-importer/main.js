@@ -17,6 +17,7 @@ const PKG = 'fishdom-importer';
 const MESH_DIR = 'db://assets/8.Models/Meshes/Fishes';
 const PREVIEW_VERSION = 2; // 2: góc 3/4 (cá) / chính diện (sinh vật khác), có đèn
 const TEX_DIR = 'db://assets/8.Models/Textures/Fishes';
+const TANK_FILL = 0.8; // cạnh lớn nhất của cá chiếm 80% content size FishTank (chừa chỗ cho cá bơi / uốn thân)
 
 function log(message) {
     console.log('[' + PKG + '] ' + message);
@@ -385,9 +386,10 @@ function glbInfo(file) {
         const len = d.readUInt32LE(12);
         const j = JSON.parse(d.toString('utf8', 20, 20 + len));
         const n = (j.nodes || []).find((x) => x.mesh !== undefined && x.skin !== undefined) || (j.nodes || []).find((x) => x.mesh !== undefined);
-        return { model: n && n.name ? n.name : '', generator: (j.asset && j.asset.generator) || '' };
+        const extras = (j.asset && j.asset.extras) || {};
+        return { model: n && n.name ? n.name : '', generator: (j.asset && j.asset.generator) || '', cloneOf: extras.cloneOf || '' };
     } catch (e) {
-        return { model: '', generator: '' };
+        return { model: '', generator: '', cloneOf: '' };
     }
 }
 
@@ -428,11 +430,21 @@ async function listProjectFish(unityRoot) {
         if (!m) continue;
         const index = parseInt(m[1], 10) - 1;
         const file = path.join(meshDir, f);
-        const { model, generator } = glbInfo(file);
+        const { model, generator, cloneOf } = glbInfo(file);
         const png = findTex('T_' + model + '_D.png') || findTex(model + '.png') || findTex('T_Fish' + m[1] + '_D.png');
         const slot = level.slots[index];
         const name = f.replace(/\.glb$/i, '');
-        const u = matchUnity(unityRoot, { name, png, generator });
+        let u = matchUnity(unityRoot, { name, png, generator });
+        // bản sao đổi màu (asset.extras.cloneOf = "SK_FishN" gốc): texture mới không khớp Unity -> dùng tham số animator của con gốc
+        if (!u && cloneOf) {
+            const srcFile = path.join(meshDir, cloneOf + '.glb');
+            if (fs.existsSync(srcFile)) {
+                const s = glbInfo(srcFile);
+                const n = (/^SK_Fish(\d+)$/i.exec(cloneOf) || [])[1];
+                const srcPng = findTex('T_' + s.model + '_D.png') || findTex(s.model + '.png') || (n ? findTex('T_Fish' + n + '_D.png') : '');
+                u = matchUnity(unityRoot, { name: cloneOf, png: srcPng, generator: s.generator });
+            }
+        }
         list.push({
             name, file, url: MESH_DIR + '/' + f, index, model, png, generator,
             unity: u ? u.unity : null, unityName: u ? u.name : '',
@@ -499,6 +511,17 @@ async function applyLevel(opts) {
                 tex[f.index] = texUuid;
             } else {
                 report('⚠ ' + f.name + ': không tìm thấy texture (T_' + f.model + '_D.png)');
+            }
+        }
+
+        // 2b. RootNode cá mẫu: scale + dời để cá trong Avatar của slot nằm gọn trong content size FishTank
+        if (opts.fitTank) {
+            const fit = await sceneScript('fitInTank', selected, TANK_FILL);
+            for (const f of fit.fish) {
+                await setProp(f.uuid, 'position', { type: 'cc.Vec3', value: { x: f.position[0], y: f.position[1], z: f.position[2] } });
+                await setProp(f.uuid, 'scale', { type: 'cc.Vec3', value: { x: f.scale[0], y: f.scale[1], z: f.scale[2] } });
+                report('Slot ' + f.type + ': vừa FishTank (' + fit.tank.map((v) => v.toFixed(0)).join(' × ') + '), scale × '
+                    + f.k.toFixed(2) + ' -> ' + f.scale[0].toFixed(3) + ', cỡ ' + f.size.map((v) => v.toFixed(0)).join(' × '));
             }
         }
 
