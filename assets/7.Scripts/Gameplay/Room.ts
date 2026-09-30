@@ -766,14 +766,37 @@ export class Room extends Component {
         src.destroy();
     }
 
+    /**
+     * Chọn nhóm trong items cho slot theo vị trí cá lúc này (không theo thứ tự cố định): loại chưa có ở slot khác,
+     * đủ cá để gom 3 con và gom đủ sớm nhất - cá đang nằm trong hộp tính là có sẵn, còn lại xét con cao thứ n
+     * (n = số con còn thiếu) trong bong bóng, càng cao càng ưu tiên. Trả về index trong items, -1 nếu không có.
+     */
+    pickItem(slot: Slot, allowUsed: boolean): number {
+        let used = this.slotNode.getComponentsInChildren(Slot).filter(s => s != slot).map(s => s.thingType);
+        let best = -1, bestScore = -Infinity;
+        this.items.forEach((array, i) => {
+            let type = array[0];
+            if(!allowUsed && used.includes(type)) return;
+            let need = array.length - this.boxes.filter(b => b.thing && b.thingType == type).length;
+            let ys = this.things.filter(t => t.thingType == type)
+                .map(t => (t.bubble ? t.bubble.node : t.node).worldPosition.y)
+                .sort((a, b) => b - a);
+            if(need > ys.length) return;
+            let score = need <= 0 ? Infinity : ys[need - 1];
+            if(best < 0 || score > bestScore) { best = i; bestScore = score; }
+        });
+        return best;
+    }
+
     setSlotThingFromArray(slot: Slot) {
-        let array = this.items.shift();
+        slot.thingType = -1;
+        let index = this.pickItem(slot, false);
+        if(index < 0) index = this.pickItem(slot, true);
+        let array = index < 0 ? undefined : this.items.splice(index, 1)[0];
         let thing: Thing = null;
-        while (array) {
+        if(array) {
             thing = this.things.find(t => t.thingType == array[0]);
             if (!thing) thing = this.boxes.map(b => b.thing).find(t => t && t.thingType == array[0]);
-            if (thing) break;
-            array = this.items.shift();
         }
 
         if(array) {
@@ -844,6 +867,7 @@ export class Room extends Component {
             }
             // items.push(new Array(value).fill(key));
         }
+        this.slots.forEach(slot => slot.thingType = -1);
         this.slots.forEach((slot) => {
             this.setSlotThingFromArray(slot);
         })
