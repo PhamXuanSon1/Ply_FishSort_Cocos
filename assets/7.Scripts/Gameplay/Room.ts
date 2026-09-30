@@ -32,21 +32,28 @@ export const BubbleData:
 [number, number, number[]][] = 
 [[132.428,1268.46,[0,26]],[-621.029,874.37,[27,0,23]],[620.997,1242.781,[20,20,27]],[-331.329,1268.474,[27,30]],[311.746,840.762,[28,20]],[710.886,827.523,[27]],[710.774,492.52,[20]],[-147.621,672.359,[29,23,0]],[245.951,381.656,[29,20]],[-226.381,189.451,[29,0]],[620.976,67.396,[27,20,26]],[-646.47,385.848,[28,28]],[125.572,0.849,[26]],[-646.417,-77.964,[26,29]],[-181.644,-297.852,[20,20,23]],[-620.956,-566.574,[30,30,0]],[342.884,-253.975,[30]],[101.306,-697.127,[28,20]],[-602.293,-1099.642,[0,30,29,0]],[-56.128,-1180.229,[26,30,0,23]],[602.341,-613.586,[28,29,28,0]],[495.364,-1155.148,[27,23,26,23]]]
 
-export const Items = [ 
-  [ 26, 26, 26 ],  [ 30, 30, 30 ],
+/**
+ * Thứ tự hộp ra slot, tính từ BubbleData (không hard code): mỗi loại cá n con -> n/3 nhóm [t, t, t].
+ * Chia theo vòng, mỗi vòng mỗi loại 1 nhóm (4 slot đầu không trùng loại). Trong vòng k, loại nào có con cao
+ * thứ 3(k+1) nằm cao hơn (gom đủ 3 con sớm hơn) thì lên slot trước.
+ */
+export function buildItems(data: [number, number, number[]][]): number[][] {
+    let ys = new Map<number, number[]>();
+    data.forEach(([, y, types]) => types.forEach(t => {
+        if(!ys.has(t)) ys.set(t, []);
+        ys.get(t).push(y);
+    }));
+    ys.forEach(list => list.sort((a, b) => b - a));
 
-  [ 28, 28, 28 ],  [ 23, 23, 23 ],
-
-  [ 27, 27, 27 ],  [ 23, 23, 23 ],
-
-  [ 0, 0, 0 ],     [ 29, 29, 29 ],
-
-  [ 26, 26, 26 ],  [ 29, 29, 29 ],
-  [ 20, 20, 20 ],  [ 20, 20, 20 ],
-  [ 27, 27, 27 ],  [ 28, 28, 28 ],
-  [ 20, 20, 20 ],  [ 0, 0, 0 ],
-  [ 0, 0, 0 ],     [ 30, 30, 30 ] 
-] 
+    let items: number[][] = [];
+    for(let k = 0; ; k++) {
+        let round = [...ys.keys()].filter(t => ys.get(t).length >= 3 * (k + 1));
+        if(round.length == 0) break;
+        round.sort((a, b) => ys.get(b)[3 * k + 2] - ys.get(a)[3 * k + 2]);
+        round.forEach(t => items.push([t, t, t]));
+    }
+    return items;
+}
 
 
 
@@ -162,7 +169,7 @@ export class Room extends Component {
 
         this.initClock();
         this.initMats();
-        this.items = [...Items];
+        this.items = buildItems(BubbleData);
         this.totalBox = this.items.length;
         console.log("Total box", this.items.length);
         this.fish = this.node.getChildByName("Fish");

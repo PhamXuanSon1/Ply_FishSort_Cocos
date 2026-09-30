@@ -377,7 +377,6 @@ async function placeInSlot(opts, prefabUuid, textureUuid, report) {
 
 const ROOM_TS = 'db://assets/7.Scripts/Gameplay/Room.ts';
 const BUBBLE_RE = /(export const BubbleData:\s*\r?\n\s*\[number, number, number\[\]\]\[\]\s*=\s*\r?\n)([^\r\n]*)/;
-const ITEMS_RE = /export const Items = \[[\s\S]*?\r?\n\][ \t]*\r?\n/;
 
 /** Tên node mesh (có skin) trong GLB - tên model (Fish20, Fish24, african_jewelfish...) + generator (PlayCanvas = bản gốc). */
 function glbInfo(file) {
@@ -403,35 +402,12 @@ function bubbleUsage(src) {
     return usage;
 }
 
-/** Items: mỗi loại cá n con -> n/3 nhóm [t, t, t], xáo trộn (thứ tự hộp ra slot). */
-function buildItems(data) {
-    const count = {};
-    for (const [, , types] of data) for (const t of types) count[t] = (count[t] || 0) + 1;
-    const items = [];
-    for (const t of Object.keys(count)) for (let i = 0; i < Math.floor(count[t] / 3); i++) items.push([+t, +t, +t]);
-    for (let i = items.length - 1; i > 0; i--) {
-        const k = Math.floor(Math.random() * (i + 1));
-        [items[i], items[k]] = [items[k], items[i]];
-    }
-    return items;
-}
-
-function formatItems(items) {
-    const cell = (a) => ('[ ' + a.join(', ') + ' ],').padEnd(16);
-    const lines = [];
-    for (let i = 0; i < items.length; i += 2) lines.push('  ' + items.slice(i, i + 2).map(cell).join(' ').trimEnd());
-    if (lines.length) lines[lines.length - 1] = lines[lines.length - 1].replace(/,$/, '');
-    return 'export const Items = [ \n' + lines.join('\n') + ' \n] \n';
-}
-
-/** Ghi BubbleData + Items vào Room.ts (giữ nguyên phần còn lại của file). */
-async function writeRoomData(data, items) {
+/** Ghi BubbleData vào Room.ts (giữ nguyên phần còn lại của file). Thứ tự slot Room tự tính lúc chạy (buildItems). */
+async function writeRoomData(data) {
     const file = await dbToFs(ROOM_TS);
     let src = fs.readFileSync(file, 'utf8');
     if (!BUBBLE_RE.test(src)) throw new Error('Không tìm thấy khai báo BubbleData trong Room.ts');
-    if (!ITEMS_RE.test(src)) throw new Error('Không tìm thấy khai báo Items trong Room.ts');
     src = src.replace(BUBBLE_RE, (_, head) => head + JSON.stringify(data));
-    src = src.replace(ITEMS_RE, formatItems(items));
     fs.writeFileSync(file, src);
     await Editor.Message.request('asset-db', 'refresh-asset', ROOM_TS);
 }
@@ -472,7 +448,7 @@ async function listProjectFish(unityRoot) {
 }
 
 /**
- * Áp dụng danh sách cá được chơi: slot (node Fish), Mats.textures, Room.fishTypes, BubbleData + Items trong Room.ts, scene.
+ * Áp dụng danh sách cá được chơi: slot (node Fish), Mats.textures, Room.fishTypes, BubbleData trong Room.ts, scene.
  * opts: { selected: [index], clearUnused, regen, save }
  */
 async function applyLevel(opts) {
@@ -546,21 +522,20 @@ async function applyLevel(opts) {
         });
         report('Room.fishTypes = [' + selected.join(', ') + ']');
 
-        // 5. BubbleData + Items: giữ vị trí / cỡ bubble đang có, chia lại loại cá (Gen Buble From Avai)
+        // 5. BubbleData: giữ vị trí / cỡ bubble đang có, chia lại loại cá (Gen Buble From Avai)
         let data = null;
         if (opts.regen) {
             data = await sceneScript('genBubbles', selected);
             if (!data.length) throw new Error('Scene không có bubble nào để gen (initBubbles chưa chạy?)');
-            const items = buildItems(data);
             const count = {};
             data.forEach(([, , t]) => t.forEach((x) => { count[x] = (count[x] || 0) + 1; }));
-            report('Gen ' + data.length + ' bubble, ' + items.length + ' hộp: ' + Object.keys(count).map((k) => 'loại ' + k + ' × ' + count[k]).join(', '));
+            report('Gen ' + data.length + ' bubble: ' + Object.keys(count).map((k) => 'loại ' + k + ' × ' + count[k]).join(', '));
             if (opts.save) {
                 await Editor.Message.request('scene', 'save-scene');
                 report('Đã lưu scene');
             }
-            await writeRoomData(data, items);
-            report('Đã ghi BubbleData + Items vào Room.ts');
+            await writeRoomData(data);
+            report('Đã ghi BubbleData vào Room.ts');
             // Room.ts compile lại -> nạp lại scene để initBubbles dùng data mới
             await sleep(6000);
             await Editor.Message.request('scene', 'soft-reload').catch(() => {});
