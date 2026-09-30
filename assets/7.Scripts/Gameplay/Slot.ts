@@ -1,4 +1,4 @@
-import { _decorator, Animation, clamp, clamp01, Component, Label, Layers, lerp, Material, math, Node, Size, sp, Sprite, Tween, tween, v3, Vec3 } from 'cc';
+import { _decorator, Animation, clamp, clamp01, Component, Label, Layers, lerp, Material, math, Node, Size, sp, Sprite, Tween, tween, UIOpacity, v3, Vec3 } from 'cc';
 import { PoolMember, PoolType } from '../Pool/PoolMember';
 import { Thing } from './Thing';
 import { FishMove } from './FishMove/FishMove';
@@ -88,6 +88,35 @@ export class Slot extends PoolMember {
         this.maxAmount = amount;
         // this.label.node.active = false;
         this.label.string =  "0/" + amount;
+        this.setStars(0, false);
+    }
+
+    /**
+     * Sao trên đầu slot (node Stars > Star0..2, mỗi sao có con "On" là sao vàng, UIOpacity). Số sao sáng = số cá
+     * đã vào slot; animate thì sao vừa sáng hiện dần + nảy to rồi về cỡ cũ (như FishSort gốc).
+     */
+    setStars(count: number, animate: boolean) {
+        let root = this.node.getChildByName("Stars");
+        if(!root) return;
+        root.children.forEach((star, i) => {
+            let on = star.getChildByName("On");
+            let op = on?.getComponent(UIOpacity);
+            if(!op) return;
+            Tween.stopAllByTarget(star);
+            Tween.stopAllByTarget(op);
+            let lit = i < count;
+            if(animate && lit && i == count - 1 && op.opacity < 255) {
+                star.setScale(1, 1, 1);
+                tween(op).to(0.15, { opacity: 255 }).start();
+                tween(star)
+                .to(0.12, { scale: v3(1.3, 1.3, 1) }, { easing: 'quadOut' })
+                .to(0.2, { scale: v3(1, 1, 1) }, { easing: 'backOut' })
+                .start();
+            } else {
+                op.opacity = lit ? 255 : 0;
+                star.setScale(1, 1, 1);
+            }
+        });
     }
 
     count: number = 0
@@ -99,6 +128,7 @@ export class Slot extends PoolMember {
         
         // this.label.string = "x" + this.amount;
         this.label.string =  this.things.length + "/" + this.maxAmount;
+        this.setStars(this.things.length, true);
     }
 
     setThingFrame(thing: Thing) {
