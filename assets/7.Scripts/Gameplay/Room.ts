@@ -116,6 +116,12 @@ export class Room extends Component {
     maxMoveX: number = 400;
     maxMoveY: number = 200;
     hintTween: Tween<any> = null;
+    firstHandHintTween: Tween<any> = null;
+    firstHandHintScheduled: boolean = false;
+    firstHandHintShown: boolean = false;
+
+    @property({ type: Number, tooltip: 'Số giây chờ trước khi hiện hand hint.' })
+    handHintDelay: number = 5;
 
     // khai báo firstTapCount để xác định số lần chạm đầu tiên mà người chơi cần thực hiện trước khi trò chơi bắt đầu.
     @property({ type: Number })
@@ -592,7 +598,22 @@ export class Room extends Component {
         
         if(t) {
             let th = t.getComponent(Thing);
-            ui?.handTap(th.touch);
+            if(!this.firstHandHintShown && !this.firstHandHintScheduled && this.fisrtTapCount > 0) {
+                this.firstHandHintScheduled = true;
+                this.firstHandHintTween = tween({})
+                .delay(Math.max(0, this.handHintDelay))
+                .call(() => {
+                    this.firstHandHintScheduled = false;
+                    const nextHint = this.taps[0]?.getComponent(Thing);
+                    if(!this.lose && this.tappable && nextHint?.touch?.isValid) {
+                        this.firstHandHintShown = true;
+                        ui?.handTap(nextHint.touch);
+                    }
+                })
+                .start();
+            } else if(this.firstHandHintShown || this.fisrtTapCount <= 0) {
+                ui?.handTap(th.touch);
+            }
         } else {
             ui?.offHand();
             this.hint();
@@ -604,7 +625,7 @@ export class Room extends Component {
         this.hintTween?.stop();
         if(this.lose || this.bound) return;
         this.hintTween = tween({})
-        .delay(5)
+        .delay(this.firstHandHintShown ? 5 : Math.max(0, this.handHintDelay))
         .call(() => {
             if(!ui.hand.active) {
                 if(this.taps.length == 0 && this.things.length > 0) {
@@ -621,6 +642,7 @@ export class Room extends Component {
                         console.log(thingFindout.node.worldPosition, ui.width, ui.height);
                         
                         this.taps = [thingFindout.node];
+                        this.firstHandHintShown = true;
                         this.tap(null);
                     } else {
                         this.hint();
